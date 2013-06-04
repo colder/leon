@@ -83,251 +83,246 @@ trait CodeExtraction extends Extractors {
       }
     }
 
-    def extractProgram: Option[Program] = {
-      def extractTopLevelDef: Option[ObjectDef] = {
-        unit.body match {
-          case p @ PackageDef(name, lst) if lst.size == 0 =>
-            reporter.error(p.pos, "No top-level definition found.")
+    private def extractTopLevelDef: Option[ObjectDef] = {
+      unit.body match {
+        case p @ PackageDef(name, lst) if lst.size == 0 =>
+          reporter.error(p.pos, "No top-level definition found.")
+          None
+
+        case PackageDef(name, lst) =>
+          if (lst.size > 1) {
+            reporter.error(lst(1).pos, "More than one top-level object. Rest will be ignored.")
+          }
+          lst(0) match {
+            case ExObjectDef(n, templ) =>
+              Some(extractObjectDef(n.toString, templ))
+
+            case other @ _ =>
+              reporter.error(other.pos, "Expected: top-level single object.")
+              None
+          }
+        }
+    }
+
+    private def extractObjectDef(nameStr: String, tmpl: Template): ObjectDef = {
+      // we assume that the template actually corresponds to an object
+      // definition. Typically it should have been obtained from the proper
+      // extractor (ExObjectDef)
+
+      var objectDefs: List[ObjectDef] = Nil
+      var funDefs: List[FunDef] = Nil
+
+      var scalaClassSyms  = Map[Symbol,Identifier]()
+      var scalaClassArgs  = Map[Symbol,Seq[(String,Tree)]]()
+      var scalaClassNames = Set[String]()
+
+      // we need the new type definitions before we can do anything...
+      tmpl.body.foreach(t =>
+        t match {
+          case ExAbstractClass(o2, sym) =>
+            if(scalaClassNames.contains(o2)) {
+              reporter.error(t.pos, "A class with the same name already exists.")
+            } else {
+              scalaClassSyms  += sym -> FreshIdentifier(o2)
+              scalaClassNames += o2
+            }
+
+          case ExCaseClass(o2, sym, args) =>
+            if(scalaClassNames.contains(o2)) {
+              reporter.error(t.pos, "A class with the same name already exists.")
+            } else {
+              scalaClassSyms  += sym -> FreshIdentifier(o2)
+              scalaClassNames += o2
+              scalaClassArgs  += sym -> args
+            }
+
+          case _ =>
+            reporter.warning(t.pos, "Ignoring top-level construct")
+        }
+      )
+
+      for ((sym, id) <- scalaClassSyms) {
+        if (sym.isAbstractClass) {
+          classesToClasses += sym -> new AbstractClassDef(id)
+        } else {
+          val ccd = new CaseClassDef(id)
+          ccd.isCaseObject = sym.isModuleClass
+          classesToClasses += sym -> ccd
+        }
+      }
+
+      for ((sym, ctd) <- classesToClasses) {
+        val superClasses: List[ClassTypeDef] = sym.tpe.baseClasses
+            .filter(bcs => scalaClassSyms.contains(bcs) && bcs != sym)
+            .map(s => classesToClasses(s)).toList
+
+
+        val superAClasses: List[AbstractClassDef] = superClasses.flatMap {
+          case acd: AbstractClassDef =>
+            Some(acd)
+          case c =>
+            reporter.error(sym.pos, "Class "+ctd.id+" is inheriting from non-abstract class "+c.id+".")
             None
+        }
 
-          case PackageDef(name, lst) if lst.size > 1 =>
-            reporter.error(lst(1).pos, "Too many top-level definitions.")
-            None
+        if (superAClasses.size > 2) {
+          reporter.error(sym.pos, "Multiple inheritance is not permitted, ignoring extra parents.")
+        }
 
-          case PackageDef(name, lst) =>
-            assert(lst.size == 1)
-            lst(0) match {
-              case ExObjectDef(n, templ) =>
-                Some(extractObjectDef(n.toString, templ))
+        superAClasses.headOption.foreach{ parent => ctd.setParent(parent) }
 
-              case other @ _ =>
-                reporter.error(other.pos, "Expected: top-level single object.")
+        ctd match {
+          case ccd: CaseClassDef =>
+            assert(scalaClassArgs contains sym)
+
+            ccd.fields = scalaClassArgs(sym).map{ case (name, asym) =>
+              val tpe = toPureScalaType(asym.tpe)
+              VarDecl(FreshIdentifier(name).setType(tpe), tpe)
+            }
+          case _ =>
+            // no fields to set
+        }
+      }
+
+      var classDefs: List[ClassTypeDef] = classesToClasses.values.toList
+
+      // we now extract the function signatures.
+      tmpl.body.foreach(
+        _ match {
+          case ExMainFunctionDef() => ;
+          case dd @ ExFunctionDef(n,p,t,b) => {
+            val mods = dd.mods
+            val funDef = extractFunSig(n, p, t).setPosInfo(dd.pos.line, dd.pos.column)
+            if(mods.isPrivate) funDef.addAnnotation("private")
+            for(a <- dd.symbol.annotations) {
+              a.atp.safeToString match {
+                case "leon.Annotations.induct" => funDef.addAnnotation("induct")
+                case "leon.Annotations.axiomatize" => funDef.addAnnotation("axiomatize")
+                case "leon.Annotations.main" => funDef.addAnnotation("main")
+                case _ => ;
+              }
+            }
+            defsToDefs += (dd.symbol -> funDef)
+          }
+          case _ => ;
+        }
+      )
+
+      // then their bodies.
+      tmpl.body.foreach(
+        _ match {
+          case ExMainFunctionDef() => ;
+          case dd @ ExFunctionDef(n,p,t,b) => {
+            val fd = defsToDefs(dd.symbol)
+            defsToDefs(dd.symbol) = extractFunDef(fd, b)
+          }
+          case _ => ;
+        }
+      )
+
+      funDefs = defsToDefs.valuesIterator.toList
+
+      // we check nothing else is polluting the object.
+      tmpl.body.foreach(
+        _ match {
+          case ExCaseClassSyntheticJunk() => ;
+          // case ExObjectDef(o2, t2) => { objectDefs = extractObjectDef(o2, t2) :: objectDefs }
+          case ExAbstractClass(_,_) => ; 
+          case ExCaseClass(_,_,_) => ; 
+          case ExConstructorDef() => ;
+          case ExMainFunctionDef() => ;
+          case ExFunctionDef(_,_,_,_) => ;
+          case tree => { reporter.error(tree.pos, "Don't know what to do with this. Not purescala?"); println(tree) }
+        }
+      )
+
+      val name: Identifier = FreshIdentifier(nameStr)
+      val theDef = new ObjectDef(name, objectDefs.reverse ::: classDefs ::: funDefs, Nil)
+
+      theDef
+    }
+
+    private def extractFunSig(nameStr: String, params: Seq[ValDef], tpt: Tree): FunDef = {
+      val newParams = params.map(p => {
+        val ptpe = toPureScalaType(p.tpt.tpe)
+        val newID = FreshIdentifier(p.name.toString).setType(ptpe)
+        owners += (Variable(newID) -> None)
+        varSubsts(p.symbol) = (() => Variable(newID))
+        VarDecl(newID, ptpe)
+      })
+      new FunDef(FreshIdentifier(nameStr), toPureScalaType(tpt.tpe), newParams)
+    }
+
+    private def extractFunDef(funDef: FunDef, body: Tree): FunDef = {
+      currentFunDef = funDef
+
+      val (body2, ensuring) = body match {
+        case ExEnsuredExpression(body2, resSym, contract) =>
+          varSubsts(resSym) = (() => ResultVariable().setType(funDef.returnType))
+          (body2, toPureScala(contract))
+
+        case ExHoldsExpression(body2) =>
+          (body2, Some(ResultVariable().setType(BooleanType)))
+
+        case _ =>
+          (body, None)
+      }
+
+      val (body3, require) = body2 match {
+        case ExRequiredExpression(body3, contract) =>
+          (body3, toPureScala(contract))
+
+        case _ =>
+          (body2, None)
+      }
+
+      val finalBody = try {
+        toPureScala(body3).map(flattenBlocks) match {
+          case Some(e) if e.getType.isInstanceOf[ArrayType] =>
+            getOwner(e) match {
+              case Some(Some(fd)) if fd == funDef =>
+                Some(e)
+
+              case None =>
+                Some(e)
+
+              case _ =>
+                reporter.error(body3.pos, "Function cannot return an array that is not locally defined")
                 None
             }
-          }
+          case e =>
+            e
+        }
+      } catch {
+        case e: ImpureCodeEncounteredException =>
+        None
       }
 
-      def extractObjectDef(nameStr: String, tmpl: Template): ObjectDef = {
-        // we assume that the template actually corresponds to an object
-        // definition. Typically it should have been obtained from the proper
-        // extractor (ExObjectDef)
-
-        var classDefs: List[ClassTypeDef] = Nil
-        var objectDefs: List[ObjectDef] = Nil
-        var funDefs: List[FunDef] = Nil
-
-        val scalaClassSyms: scala.collection.mutable.Map[Symbol,Identifier] =
-          scala.collection.mutable.Map.empty[Symbol,Identifier]
-        val scalaClassArgs: scala.collection.mutable.Map[Symbol,Seq[(String,Tree)]] =
-          scala.collection.mutable.Map.empty[Symbol,Seq[(String,Tree)]]
-        val scalaClassNames: scala.collection.mutable.Set[String] = 
-          scala.collection.mutable.Set.empty[String]
-
-        // we need the new type definitions before we can do anything...
-        tmpl.body.foreach(t =>
-          t match {
-            case ExAbstractClass(o2, sym) => {
-              if(scalaClassNames.contains(o2)) {
-                reporter.error(t.pos, "A class with the same name already exists.")
-              } else {
-                scalaClassSyms += (sym -> FreshIdentifier(o2))
-                scalaClassNames += o2
-              }
-            }
-            case ExCaseClass(o2, sym, args) => {
-              if(scalaClassNames.contains(o2)) {
-                reporter.error(t.pos, "A class with the same name already exists.")
-              } else {
-                scalaClassSyms  += (sym -> FreshIdentifier(o2))
-                scalaClassNames += o2
-                scalaClassArgs  += (sym -> args)
-              }
-            }
-            case _ => ;
-          }
-        )
-
-        scalaClassSyms.foreach(p => {
-            if(p._1.isAbstractClass) {
-              classesToClasses += (p._1 -> new AbstractClassDef(p._2))
-            } else if(p._1.isCase) {
-              val ccd = new CaseClassDef(p._2)
-              ccd.isCaseObject = p._1.isModuleClass
-              classesToClasses += (p._1 -> ccd)
-            }
-        })
-
-        classesToClasses.foreach(p => {
-          val superC: List[ClassTypeDef] = p._1.tpe.baseClasses.filter(bcs => scalaClassSyms.exists(pp => pp._1 == bcs) && bcs != p._1).map(s => classesToClasses(s)).toList
-
-          val superAC: List[AbstractClassDef] = superC.map(c => {
-              if(!c.isInstanceOf[AbstractClassDef]) {
-                  reporter.error(p._1.pos, "Class is inheriting from non-abstract class.")
-                  null
-              } else {
-                  c.asInstanceOf[AbstractClassDef]
-              }
-          }).filter(_ != null)
-
-          if(superAC.length > 1) {
-              reporter.error(p._1.pos, "Multiple inheritance.")
-          }
-
-          if(superAC.length == 1) {
-              p._2.setParent(superAC.head)
-          }
-
-          if(p._2.isInstanceOf[CaseClassDef]) {
-            // this should never fail
-            val ccargs = scalaClassArgs(p._1)
-            p._2.asInstanceOf[CaseClassDef].fields = ccargs.map(cca => {
-              val cctpe = toPureScalaType(cca._2.tpe)
-              VarDecl(FreshIdentifier(cca._1).setType(cctpe), cctpe)
-            })
-          }
-        })
-
-        classDefs = classesToClasses.valuesIterator.toList
-        
-        // end of class (type) extraction
-
-        // we now extract the function signatures.
-        tmpl.body.foreach(
-          _ match {
-            case ExMainFunctionDef() => ;
-            case dd @ ExFunctionDef(n,p,t,b) => {
-              val mods = dd.mods
-              val funDef = extractFunSig(n, p, t).setPosInfo(dd.pos.line, dd.pos.column)
-              if(mods.isPrivate) funDef.addAnnotation("private")
-              for(a <- dd.symbol.annotations) {
-                a.atp.safeToString match {
-                  case "leon.Annotations.induct" => funDef.addAnnotation("induct")
-                  case "leon.Annotations.axiomatize" => funDef.addAnnotation("axiomatize")
-                  case "leon.Annotations.main" => funDef.addAnnotation("main")
-                  case _ => ;
-                }
-              }
-              defsToDefs += (dd.symbol -> funDef)
-            }
-            case _ => ;
-          }
-        )
-
-        // then their bodies.
-        tmpl.body.foreach(
-          _ match {
-            case ExMainFunctionDef() => ;
-            case dd @ ExFunctionDef(n,p,t,b) => {
-              val fd = defsToDefs(dd.symbol)
-              defsToDefs(dd.symbol) = extractFunDef1(fd, b)
-            }
-            case _ => ;
-          }
-        )
-
-        funDefs = defsToDefs.valuesIterator.toList
-
-        // we check nothing else is polluting the object.
-        tmpl.body.foreach(
-          _ match {
-            case ExCaseClassSyntheticJunk() => ;
-            // case ExObjectDef(o2, t2) => { objectDefs = extractObjectDef(o2, t2) :: objectDefs }
-            case ExAbstractClass(_,_) => ; 
-            case ExCaseClass(_,_,_) => ; 
-            case ExConstructorDef() => ;
-            case ExMainFunctionDef() => ;
-            case ExFunctionDef(_,_,_,_) => ;
-            case tree => { reporter.error(tree.pos, "Don't know what to do with this. Not purescala?"); println(tree) }
-          }
-        )
-
-        val name: Identifier = FreshIdentifier(nameStr)
-        val theDef = new ObjectDef(name, objectDefs.reverse ::: classDefs ::: funDefs, Nil)
-        
-        theDef
+      val finalRequire = require.filter{ e =>
+        if(containsLetDef(e)) {
+          reporter.error(body3.pos, "Function precondtion should not contain nested function definition")
+          false
+        } else {
+          true
+        }
       }
 
-      def extractFunSig(nameStr: String, params: Seq[ValDef], tpt: Tree): FunDef = {
-        val newParams = params.map(p => {
-          val ptpe = toPureScalaType(p.tpt.tpe)
-          val newID = FreshIdentifier(p.name.toString).setType(ptpe)
-          owners += (Variable(newID) -> None)
-          varSubsts(p.symbol) = (() => Variable(newID))
-          VarDecl(newID, ptpe)
-        })
-        new FunDef(FreshIdentifier(nameStr), toPureScalaType(tpt.tpe), newParams)
+      val finalEnsuring = ensuring.filter{ e =>
+        if(containsLetDef(e)) {
+          reporter.error(body3.pos, "Function postcondition should not contain nested function definition")
+          false
+        } else {
+          true
+        }
       }
 
-      def extractFunDef1(funDef: FunDef, body: Tree): FunDef = {
-        currentFunDef = funDef
+      funDef.body          = finalBody
+      funDef.precondition  = finalRequire
+      funDef.postcondition = finalEnsuring
+      funDef
+    }
 
-        val (body2, ensuring) = body match {
-          case ExEnsuredExpression(body2, resSym, contract) =>
-            varSubsts(resSym) = (() => ResultVariable().setType(funDef.returnType))
-            (body2, toPureScala(contract))
-
-          case ExHoldsExpression(body2) =>
-            (body2, Some(ResultVariable().setType(BooleanType)))
-
-          case _ =>
-            (body, None)
-        }
-
-        val (body3, require) = body2 match {
-          case ExRequiredExpression(body3, contract) =>
-            (body3, toPureScala(contract))
-
-          case _ =>
-            (body2, None)
-        }
-
-        val finalBody = try {
-          toPureScala(body3).map(flattenBlocks) match {
-            case Some(e) if e.getType.isInstanceOf[ArrayType] =>
-              getOwner(e) match {
-                case Some(Some(fd)) if fd == funDef =>
-                  Some(e)
-
-                case None =>
-                  Some(e)
-
-                case _ =>
-                  reporter.error(body3.pos, "Function cannot return an array that is not locally defined")
-                  None
-              }
-            case e =>
-              e
-          }
-        } catch {
-          case e: ImpureCodeEncounteredException =>
-          None
-        }
-
-        val finalRequire = require.filter{ e =>
-          if(containsLetDef(e)) {
-            reporter.error(body3.pos, "Function precondtion should not contain nested function definition")
-            false
-          } else {
-            true
-          }
-        }
-
-        val finalEnsuring = ensuring.filter{ e =>
-          if(containsLetDef(e)) {
-            reporter.error(body3.pos, "Function postcondition should not contain nested function definition")
-            false
-          } else {
-            true
-          }
-        }
-
-        funDef.body          = finalBody
-        funDef.precondition  = finalRequire
-        funDef.postcondition = finalEnsuring
-        funDef
-      }
-
-      // THE EXTRACTION CODE STARTS HERE
+    def extractProgram: Option[Program] = {
       val topLevelObjDef = extractTopLevelDef
 
       val programName: Identifier = unit.body match {
