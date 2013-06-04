@@ -74,21 +74,16 @@ trait CodeExtraction extends Extractors {
       }
     }
 
-    def toPureScalaType(typeTree: Type): Option[purescala.TypeTrees.TypeTree] = {
+    def toPureScalaType(typeTree: Type): purescala.TypeTrees.TypeTree = {
       try {
-        Some(scalaType2PureScala(unit)(typeTree))
+        scalaType2PureScala(unit)(typeTree)
       } catch {
         case e: ImpureCodeEncounteredException =>
-          None
+          Untyped
       }
     }
 
     def extractProgram: Option[Program] = {
-      def st2ps(tree: Type) = toPureScalaType(tree) match {
-        case Some(tt) => tt
-        case None     => Untyped
-      }
-
       def extractTopLevelDef: Option[ObjectDef] = {
         unit.body match {
           case p @ PackageDef(name, lst) if lst.size == 0 =>
@@ -186,7 +181,7 @@ trait CodeExtraction extends Extractors {
             // this should never fail
             val ccargs = scalaClassArgs(p._1)
             p._2.asInstanceOf[CaseClassDef].fields = ccargs.map(cca => {
-              val cctpe = st2ps(cca._2.tpe)
+              val cctpe = toPureScalaType(cca._2.tpe)
               VarDecl(FreshIdentifier(cca._1).setType(cctpe), cctpe)
             })
           }
@@ -224,7 +219,7 @@ trait CodeExtraction extends Extractors {
             case ExMainFunctionDef() => ;
             case dd @ ExFunctionDef(n,p,t,b) => {
               val fd = defsToDefs(dd.symbol)
-              defsToDefs(dd.symbol) = extractFunDef(fd, b)
+              defsToDefs(dd.symbol) = extractFunDef1(fd, b)
             }
             case _ => ;
           }
@@ -254,16 +249,16 @@ trait CodeExtraction extends Extractors {
 
       def extractFunSig(nameStr: String, params: Seq[ValDef], tpt: Tree): FunDef = {
         val newParams = params.map(p => {
-          val ptpe = st2ps(p.tpt.tpe)
+          val ptpe = toPureScalaType(p.tpt.tpe)
           val newID = FreshIdentifier(p.name.toString).setType(ptpe)
           owners += (Variable(newID) -> None)
           varSubsts(p.symbol) = (() => Variable(newID))
           VarDecl(newID, ptpe)
         })
-        new FunDef(FreshIdentifier(nameStr), st2ps(tpt.tpe), newParams)
+        new FunDef(FreshIdentifier(nameStr), toPureScalaType(tpt.tpe), newParams)
       }
 
-      def extractFunDef(funDef: FunDef, body: Tree): FunDef = {
+      def extractFunDef1(funDef: FunDef, body: Tree): FunDef = {
         currentFunDef = funDef
 
         val (body2, ensuring) = body match {
@@ -437,7 +432,7 @@ trait CodeExtraction extends Extractors {
       new FunDef(FreshIdentifier(nameStr), scalaType2PureScala(unit)(tpt.tpe), newParams)
     }
 
-    def extractFunDef(funDef: FunDef, body: Tree): FunDef = {
+    def extractFunDef2(funDef: FunDef, body: Tree): FunDef = {
       currentFunDef = funDef
 
       val (body2, ensuring) = body match {
@@ -603,7 +598,7 @@ trait CodeExtraction extends Extractors {
             val oldMutableVarSubst = mutableVarSubsts.toMap //take an immutable snapshot of the map
             val oldCurrentFunDef = currentFunDef
             mutableVarSubsts.clear //reseting the visible mutable vars, we do not handle mutable variable closure in nested functions
-            val funDefWithBody = extractFunDef(funDef, b)
+            val funDefWithBody = extractFunDef2(funDef, b)
             mutableVarSubsts ++= oldMutableVarSubst
             currentFunDef = oldCurrentFunDef
             val restTree = rest match {
