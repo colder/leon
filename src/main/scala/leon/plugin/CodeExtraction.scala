@@ -64,6 +64,14 @@ trait CodeExtraction extends Extractors {
     sym == function1TraitSym
   }
 
+  class ScalaPos(p: global.Position) extends ScalacPositional {
+    setPosInfo(p.line, p.column)
+  }
+
+  implicit def scalaPosToLeonPos(p: global.Position): ScalacPositional = {
+    new ScalaPos(p)
+  }
+
   class Extraction(unit: CompilationUnit) {
     def toPureScala(tree: Tree): Option[Expr] = {
       try {
@@ -109,37 +117,32 @@ trait CodeExtraction extends Extractors {
       // definition. Typically it should have been obtained from the proper
       // extractor (ExObjectDef)
 
-      var objectDefs: List[ObjectDef] = Nil
-      var funDefs: List[FunDef] = Nil
-
       var scalaClassSyms  = Map[Symbol,Identifier]()
       var scalaClassArgs  = Map[Symbol,Seq[(String,Tree)]]()
       var scalaClassNames = Set[String]()
 
       // we need the new type definitions before we can do anything...
-      tmpl.body.foreach(t =>
-        t match {
-          case ExAbstractClass(o2, sym) =>
-            if(scalaClassNames.contains(o2)) {
-              reporter.error(t.pos, "A class with the same name already exists.")
-            } else {
-              scalaClassSyms  += sym -> FreshIdentifier(o2)
-              scalaClassNames += o2
-            }
+      for (t <- tmpl.body) t match {
+        case ExAbstractClass(o2, sym) =>
+          if(scalaClassNames.contains(o2)) {
+            reporter.error(t.pos, "A class with the same name already exists.")
+          } else {
+            scalaClassSyms  += sym -> FreshIdentifier(o2)
+            scalaClassNames += o2
+          }
 
-          case ExCaseClass(o2, sym, args) =>
-            if(scalaClassNames.contains(o2)) {
-              reporter.error(t.pos, "A class with the same name already exists.")
-            } else {
-              scalaClassSyms  += sym -> FreshIdentifier(o2)
-              scalaClassNames += o2
-              scalaClassArgs  += sym -> args
-            }
+        case ExCaseClass(o2, sym, args) =>
+          if(scalaClassNames.contains(o2)) {
+            reporter.error(t.pos, "A class with the same name already exists.")
+          } else {
+            scalaClassSyms  += sym -> FreshIdentifier(o2)
+            scalaClassNames += o2
+            scalaClassArgs  += sym -> args
+          }
 
-          case _ =>
-            reporter.warning(t.pos, "Ignoring top-level construct")
-        }
-      )
+        case _ =>
+
+      }
 
       for ((sym, id) <- scalaClassSyms) {
         if (sym.isAbstractClass) {
@@ -186,60 +189,56 @@ trait CodeExtraction extends Extractors {
 
       var classDefs: List[ClassTypeDef] = classesToClasses.values.toList
 
-      // we now extract the function signatures.
-      tmpl.body.foreach(
-        _ match {
-          case ExMainFunctionDef() => ;
-          case dd @ ExFunctionDef(n,p,t,b) => {
-            val mods = dd.mods
-            val funDef = extractFunSig(n, p, t).setPosInfo(dd.pos.line, dd.pos.column)
-            if(mods.isPrivate) funDef.addAnnotation("private")
-            for(a <- dd.symbol.annotations) {
-              a.atp.safeToString match {
-                case "leon.Annotations.induct" => funDef.addAnnotation("induct")
-                case "leon.Annotations.axiomatize" => funDef.addAnnotation("axiomatize")
-                case "leon.Annotations.main" => funDef.addAnnotation("main")
-                case _ => ;
-              }
+      // First pass to instanciate all FunDefs
+      for (d <- tmpl.body) d match {
+        case ExMainFunctionDef() =>
+          reporter.warning(d.pos, "Ignoring main function")
+
+        case dd @ ExFunctionDef(name, params, tpe, body) =>
+          val funDef = extractFunSig(name, params, tpe).setPosInfo(dd.pos)
+
+          if (dd.mods.isPrivate) {
+            funDef.addAnnotation("private")
+          }
+
+          for(a <- dd.symbol.annotations) {
+            a.atp.safeToString match {
+              case "leon.Annotations.induct"     => funDef.addAnnotation("induct")
+              case "leon.Annotations.axiomatize" => funDef.addAnnotation("axiomatize")
+              case "leon.Annotations.main"       => funDef.addAnnotation("main")
+              case _ => ;
             }
-            defsToDefs += (dd.symbol -> funDef)
           }
-          case _ => ;
-        }
-      )
 
-      // then their bodies.
-      tmpl.body.foreach(
-        _ match {
-          case ExMainFunctionDef() => ;
-          case dd @ ExFunctionDef(n,p,t,b) => {
-            val fd = defsToDefs(dd.symbol)
-            defsToDefs(dd.symbol) = extractFunDef(fd, b)
-          }
-          case _ => ;
-        }
-      )
+          defsToDefs += dd.symbol -> funDef
 
-      funDefs = defsToDefs.valuesIterator.toList
+        case _ =>
+      }
 
-      // we check nothing else is polluting the object.
-      tmpl.body.foreach(
-        _ match {
-          case ExCaseClassSyntheticJunk() => ;
-          // case ExObjectDef(o2, t2) => { objectDefs = extractObjectDef(o2, t2) :: objectDefs }
-          case ExAbstractClass(_,_) => ; 
-          case ExCaseClass(_,_,_) => ; 
-          case ExConstructorDef() => ;
-          case ExMainFunctionDef() => ;
-          case ExFunctionDef(_,_,_,_) => ;
-          case tree => { reporter.error(tree.pos, "Don't know what to do with this. Not purescala?"); println(tree) }
-        }
-      )
+      // Second pass to convert function bodies
+      for (d <- tmpl.body) d match {
+        case dd @ ExFunctionDef(_, _, _, body) if defsToDefs contains dd.symbol =>
+          val fd = defsToDefs(dd.symbol)
 
-      val name: Identifier = FreshIdentifier(nameStr)
-      val theDef = new ObjectDef(name, objectDefs.reverse ::: classDefs ::: funDefs, Nil)
+          extractFunDef(fd, body)
+        case _ =>
+      }
 
-      theDef
+      var funDefs: List[FunDef] = defsToDefs.values.toList
+
+      // FIXME: we check nothing else is polluting the object
+      for (t <- tmpl.body) t match {
+        case ExAbstractClass(_,_) =>
+        case ExCaseClass(_,_,_) =>
+        case ExConstructorDef() =>
+        case ExMainFunctionDef() =>
+        case ExFunctionDef(_,_,_,_) =>
+        case tree =>
+          reporter.error(tree.pos, "Don't know what to do with this. Not purescala?");
+          println(tree)
+      }
+
+      new ObjectDef(FreshIdentifier(nameStr), classDefs ::: funDefs, Nil)
     }
 
     private def extractFunSig(nameStr: String, params: Seq[ValDef], tpt: Tree): FunDef = {
