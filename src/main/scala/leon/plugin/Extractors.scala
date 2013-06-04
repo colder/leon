@@ -8,7 +8,6 @@ import scala.tools.nsc._
 /** Contains extractors to pull-out interesting parts of the Scala ASTs. */
 trait Extractors {
   val global: Global
-  val pluginInstance: LeonPlugin
 
   import global._
   import global.definitions._
