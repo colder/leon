@@ -64,6 +64,10 @@ trait CodeExtraction extends Extractors {
     sym == function1TraitSym
   }
 
+  class Extraction(unit: CompilationUnit) {
+
+  }
+
   private val mutableVarSubsts: scala.collection.mutable.Map[Symbol,Function0[Expr]] =
     scala.collection.mutable.Map.empty[Symbol,Function0[Expr]]
   private val varSubsts: scala.collection.mutable.Map[Symbol,Function0[Expr]] =
@@ -74,8 +78,6 @@ trait CodeExtraction extends Extractors {
     scala.collection.mutable.Map.empty[Symbol,FunDef]
 
   def extractCode(unit: CompilationUnit): Option[Program] = {
-    import scala.collection.mutable.HashMap
-
     def s2ps(tree: Tree) = toPureScala(unit)(tree)
 
     def st2ps(tree: Type) = toPureScalaType(unit)(tree) match {
@@ -479,7 +481,7 @@ trait CodeExtraction extends Extractors {
 
       val finalRequire = require.filter{ e =>
         if (containsLetDef(e)) {
-          unit.error(e, "Function precondtion should not contain nested function definition")
+          unit.error(body3.pos, "Function precondtion should not contain nested function definition")
           false
         } else {
           true
@@ -488,7 +490,7 @@ trait CodeExtraction extends Extractors {
 
       val finalEnsuring = ensuring.filter{ e =>
         if (containsLetDef(e)) {
-          unit.error(e, "Function postconfition should not contain nested function definition")
+          unit.error(body3.pos, "Function postconfition should not contain nested function definition")
           false
         } else {
           true
