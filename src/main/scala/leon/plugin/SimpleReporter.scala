@@ -52,21 +52,22 @@ class SimpleReporter(val settings: Settings, reporter: leon.Reporter) extends Ab
       case _ =>
         val buf = new StringBuilder(msg)
         val file = pos.source.file
-        printMessage(pos.line + ": " + msg, severity)
-        printSourceLine(pos, severity)
+        printMessage(pos.line + ": " + msg+"\n"+getSourceLine(pos), severity)
     }
   }
   def print(pos: Position, msg: String, severity: Severity) {
     printMessage(pos, clabel(severity) + msg, severity)
   }
 
-  def printSourceLine(pos: Position, severity: Severity) {
-    printMessage(pos.lineContent.stripLineEnd, severity)
-    printColumnMarker(pos, severity: Severity)
+  def getSourceLine(pos: Position) = {
+    pos.lineContent.stripLineEnd+getColumnMarker(pos)
   }
 
-  def printColumnMarker(pos: Position, severity: Severity) = 
-    if (pos.isDefined) { printMessage(" " * (pos.column - 1) + "^", severity) }
+  def getColumnMarker(pos: Position) = if (pos.isDefined) { 
+      "\n"+(" " * (pos.column - 1) + "^")
+    } else {
+      ""
+    }
   
   def printSummary() {
     if (WARNING.count > 0) printMessage(getCountString(WARNING) + " found", INFO)

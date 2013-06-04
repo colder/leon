@@ -191,7 +191,7 @@ trait CodeExtraction extends Extractors {
       // First pass to instanciate all FunDefs
       for (d <- tmpl.body) d match {
         case ExMainFunctionDef() =>
-          reporter.warning(d.pos, "Ignoring main function")
+          // we ignore the main function
 
         case dd @ ExFunctionDef(name, params, tpe, body) =>
           val funDef = extractFunSig(name, params, tpe).setPosInfo(dd.pos)
