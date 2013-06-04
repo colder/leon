@@ -38,7 +38,11 @@ object ExtractionPhase extends LeonPhase[List[String], Program] {
 
       compiler.leonExtraction.program match {
         case Some(p) =>
-          p
+          if (ctx.reporter.errorCount > 0 && ctx.settings.strictCompilation) {
+            ctx.reporter.fatalError("Error while compiling.")
+          } else {
+            p
+          }
         case None =>
           ctx.reporter.fatalError("Error while compiling.")
       }

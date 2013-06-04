@@ -9,6 +9,7 @@ class ScalaCompiler(settings : NSCSettings, ctx: LeonContext) extends Global(set
     val global: ScalaCompiler.this.type = ScalaCompiler.this
     val runsAfter = List[String]("refchecks")
     val runsRightAfter = None
+    val ctx = ScalaCompiler.this.ctx
   } with LeonExtraction
 
   override protected def computeInternalPhases() : Unit = {

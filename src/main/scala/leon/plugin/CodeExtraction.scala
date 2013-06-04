@@ -23,7 +23,6 @@ trait CodeExtraction extends Extractors {
   import ExpressionExtractors._
   import ExtractorHelpers._
 
-
   private lazy val setTraitSym = definitions.getClass("scala.collection.immutable.Set")
   private lazy val mapTraitSym = definitions.getClass("scala.collection.immutable.Map")
   private lazy val multisetTraitSym = try {
@@ -228,6 +227,7 @@ trait CodeExtraction extends Extractors {
 
       // FIXME: we check nothing else is polluting the object
       for (t <- tmpl.body) t match {
+        case ExCaseClassSyntheticJunk() =>
         case ExAbstractClass(_,_) =>
         case ExCaseClass(_,_,_) =>
         case ExConstructorDef() =>
@@ -645,14 +645,14 @@ trait CodeExtraction extends Extractors {
                 getOwner(rhsTree) match {
                   case None =>
                   case Some(_) =>
-                    unit.error(nextExpr.pos, "Cannot alias array")
+                    reporter.error(nextExpr.pos, "Cannot alias array")
                     throw ImpureCodeEncounteredException(nextExpr)
                 }
               }
               Assignment(id, rhsTree)
             }
             case None => {
-              unit.error(tr.pos, "Undeclared variable.")
+              reporter.error(tr.pos, "Undeclared variable.")
               throw ImpureCodeEncounteredException(tr)
             }
           }
@@ -680,7 +680,7 @@ trait CodeExtraction extends Extractors {
             case None => mutableVarSubsts.get(sym) match {
               case Some(fun) => fun()
               case None => {
-                unit.error(tr.pos, "Unidentified variable.")
+                reporter.error(tr.pos, "Unidentified variable.")
                 throw ImpureCodeEncounteredException(tr)
               }
             }
@@ -695,7 +695,7 @@ trait CodeExtraction extends Extractors {
               case None => varSubsts.remove(varSym)
             }
             if(containsEpsilon(c1)) {
-              unit.error(epsi.pos, "Usage of nested epsilon is not allowed.")
+              reporter.error(epsi.pos, "Usage of nested epsilon is not allowed.")
               throw ImpureCodeEncounteredException(epsi)
             }
             Epsilon(c1).setType(pstpe).setPosInfo(epsi.pos.line, epsi.pos.column)
@@ -725,7 +725,7 @@ trait CodeExtraction extends Extractors {
           case ExCaseClassConstruction(tpt, args) => {
             val cctype = scalaType2PureScala(unit)(tpt.tpe)
             if(!cctype.isInstanceOf[CaseClassType]) {
-              unit.error(tr.pos, "Construction of a non-case class.")
+              reporter.error(tr.pos, "Construction of a non-case class.")
               throw ImpureCodeEncounteredException(tree)
             }
             val nargs = args.map(rec(_))
@@ -789,7 +789,7 @@ trait CodeExtraction extends Extractors {
             }
 
             if (singletons.size != elems.size) {
-              unit.error(nextExpr.pos, "Some map elements could not be extracted as Tuple2")
+              reporter.error(nextExpr.pos, "Some map elements could not be extracted as Tuple2")
               throw ImpureCodeEncounteredException(nextExpr)
             }
 
@@ -799,7 +799,7 @@ trait CodeExtraction extends Extractors {
           case ExSetMin(t) => {
             val set = rec(t)
             if(!set.getType.isInstanceOf[SetType]) {
-              unit.error(t.pos, "Min should be computed on a set.")
+              reporter.error(t.pos, "Min should be computed on a set.")
               throw ImpureCodeEncounteredException(tree)
             }
             SetMin(set).setType(set.getType.asInstanceOf[SetType].base)
@@ -807,7 +807,7 @@ trait CodeExtraction extends Extractors {
           case ExSetMax(t) => {
             val set = rec(t)
             if(!set.getType.isInstanceOf[SetType]) {
-              unit.error(t.pos, "Max should be computed on a set.")
+              reporter.error(t.pos, "Max should be computed on a set.")
               throw ImpureCodeEncounteredException(tree)
             }
             SetMax(set).setType(set.getType.asInstanceOf[SetType].base)
@@ -819,7 +819,7 @@ trait CodeExtraction extends Extractors {
               case s @ SetType(_) => SetUnion(rl, rr).setType(s)
               case m @ MultisetType(_) => MultisetUnion(rl, rr).setType(m)
               case _ => {
-                unit.error(tree.pos, "Union of non set/multiset expressions.")
+                reporter.error(tree.pos, "Union of non set/multiset expressions.")
                 throw ImpureCodeEncounteredException(tree)
               }
             }
@@ -831,7 +831,7 @@ trait CodeExtraction extends Extractors {
               case s @ SetType(_) => SetIntersection(rl, rr).setType(s)
               case m @ MultisetType(_) => MultisetIntersection(rl, rr).setType(m)
               case _ => {
-                unit.error(tree.pos, "Intersection of non set/multiset expressions.")
+                reporter.error(tree.pos, "Intersection of non set/multiset expressions.")
                 throw ImpureCodeEncounteredException(tree)
               }
             }
@@ -842,7 +842,7 @@ trait CodeExtraction extends Extractors {
             rl.getType match {
               case s @ SetType(_) => ElementOfSet(rr, rl)
               case _ => {
-                unit.error(tree.pos, ".contains on non set expression.")
+                reporter.error(tree.pos, ".contains on non set expression.")
                 throw ImpureCodeEncounteredException(tree)
               }
             }
@@ -853,7 +853,7 @@ trait CodeExtraction extends Extractors {
             rl.getType match {
               case s @ SetType(_) => SubsetOf(rl, rr)
               case _ => {
-                unit.error(tree.pos, "Subset on non set expression.")
+                reporter.error(tree.pos, "Subset on non set expression.")
                 throw ImpureCodeEncounteredException(tree)
               }
             }
@@ -865,7 +865,7 @@ trait CodeExtraction extends Extractors {
               case s @ SetType(_) => SetDifference(rl, rr).setType(s)
               case m @ MultisetType(_) => MultisetDifference(rl, rr).setType(m)
               case _ => {
-                unit.error(tree.pos, "Difference of non set/multiset expressions.")
+                reporter.error(tree.pos, "Difference of non set/multiset expressions.")
                 throw ImpureCodeEncounteredException(tree)
               }
             }
@@ -876,7 +876,7 @@ trait CodeExtraction extends Extractors {
               case s @ SetType(_) => SetCardinality(rt)
               case m @ MultisetType(_) => MultisetCardinality(rt)
               case _ => {
-                unit.error(tree.pos, "Cardinality of non set/multiset expressions.")
+                reporter.error(tree.pos, "Cardinality of non set/multiset expressions.")
                 throw ImpureCodeEncounteredException(tree)
               }
             }
@@ -886,7 +886,7 @@ trait CodeExtraction extends Extractors {
             rt.getType match {
               case m @ MultisetType(u) => MultisetToSet(rt).setType(SetType(u))
               case _ => {
-                unit.error(tree.pos, "toSet can only be applied to multisets.")
+                reporter.error(tree.pos, "toSet can only be applied to multisets.")
                 throw ImpureCodeEncounteredException(tree)
               }
             }
@@ -903,7 +903,7 @@ trait CodeExtraction extends Extractors {
                 ArrayUpdated(rm, rf, rt).setType(rm.getType).setPosInfo(up.pos.line, up.pos.column)
               }
               case _ => {
-                unit.error(tree.pos, "updated can only be applied to maps.")
+                reporter.error(tree.pos, "updated can only be applied to maps.")
                 throw ImpureCodeEncounteredException(tree)
               }
             }
@@ -931,7 +931,7 @@ trait CodeExtraction extends Extractors {
                 ArraySelect(rlhs, rargs.head).setType(bt).setPosInfo(app.pos.line, app.pos.column)
               }
               case _ => {
-                unit.error(tree.pos, "apply on unexpected type")
+                reporter.error(tree.pos, "apply on unexpected type")
                 throw ImpureCodeEncounteredException(tree)
               }
             }
@@ -942,16 +942,16 @@ trait CodeExtraction extends Extractors {
             lhsRec match {
               case Variable(_) =>
               case _ => {
-                unit.error(tree.pos, "array update only works on variables")
+                reporter.error(tree.pos, "array update only works on variables")
                 throw ImpureCodeEncounteredException(tree)
               }
             }
             getOwner(lhsRec) match {
               case Some(Some(fd)) if fd != currentFunDef => 
-                unit.error(nextExpr.pos, "cannot update an array that is not defined locally")
+                reporter.error(nextExpr.pos, "cannot update an array that is not defined locally")
                 throw ImpureCodeEncounteredException(nextExpr)
               case Some(None) =>
-                unit.error(nextExpr.pos, "cannot update an array that is not defined locally")
+                reporter.error(nextExpr.pos, "cannot update an array that is not defined locally")
                 throw ImpureCodeEncounteredException(nextExpr)
               case Some(_) =>
               case None => sys.error("This array: " + lhsRec + " should have had an owner")
@@ -977,7 +977,7 @@ trait CodeExtraction extends Extractors {
           case ExIfThenElse(t1,t2,t3) => {
             val r1 = rec(t1)
             if(containsLetDef(r1)) {
-              unit.error(t1.pos, "Condition of if-then-else expression should not contain nested function definition")
+              reporter.error(t1.pos, "Condition of if-then-else expression should not contain nested function definition")
               throw ImpureCodeEncounteredException(t1)
             }
             val r2 = rec(t2)
@@ -986,7 +986,7 @@ trait CodeExtraction extends Extractors {
             lub match {
               case Some(lub) => IfExpr(r1, r2, r3).setType(lub)
               case None =>
-                unit.error(nextExpr.pos, "Both branches of ifthenelse have incompatible types")
+                reporter.error(nextExpr.pos, "Both branches of ifthenelse have incompatible types")
                 throw ImpureCodeEncounteredException(t1)
             }
           }
@@ -998,14 +998,14 @@ trait CodeExtraction extends Extractors {
               case CaseClassType(ccd) => {
                 val rootType: ClassTypeDef  = if(ccd.parent != None) ccd.parent.get else ccd
                 if(!ccRec.getType.isInstanceOf[ClassType]) {
-                  unit.error(tr.pos, "isInstanceOf can only be used with a case class")
+                  reporter.error(tr.pos, "isInstanceOf can only be used with a case class")
                   throw ImpureCodeEncounteredException(tr)
                 } else {
                   val testedExprType = ccRec.getType.asInstanceOf[ClassType].classDef
                   val testedExprRootType: ClassTypeDef = if(testedExprType.parent != None) testedExprType.parent.get else testedExprType
 
                   if(rootType != testedExprRootType) {
-                    unit.error(tr.pos, "isInstanceOf can only be used with compatible case classes")
+                    reporter.error(tr.pos, "isInstanceOf can only be used with compatible case classes")
                     throw ImpureCodeEncounteredException(tr)
                   } else {
                     CaseClassInstanceOf(ccd, ccRec) 
@@ -1013,7 +1013,7 @@ trait CodeExtraction extends Extractors {
                 }
               }
               case _ => {
-                unit.error(tr.pos, "isInstanceOf can only be used with a case class")
+                reporter.error(tr.pos, "isInstanceOf can only be used with a case class")
                 throw ImpureCodeEncounteredException(tr)
               }
             }
@@ -1021,7 +1021,7 @@ trait CodeExtraction extends Extractors {
 
           case lc @ ExLocalCall(sy,nm,ar) => {
             if(defsToDefs.keysIterator.find(_ == sy).isEmpty) {
-              unit.error(tr.pos, "Invoking an invalid function.")
+              reporter.error(tr.pos, "Invoking an invalid function.")
               throw ImpureCodeEncounteredException(tr)
             }
             val fd = defsToDefs(sy)
@@ -1035,10 +1035,9 @@ trait CodeExtraction extends Extractors {
             MatchExpr(rs, rc).setType(rt).setPosInfo(pm.pos.line,pm.pos.column)
           }
 
-      
           // default behaviour is to complain :)
           case _ => {
-            reporter.info(tr.pos, "Could not extract as PureScala.", true)
+            reporter.error(tr.pos, "Could not extract as PureScala.")
             throw ImpureCodeEncounteredException(tree)
           }
         }
@@ -1079,7 +1078,7 @@ trait CodeExtraction extends Extractors {
       case TypeRef(_, sym, btt :: Nil) if isArrayClassSym(sym) => ArrayType(rec(btt))
       case TypeRef(_, sym, Nil) if classesToClasses.keySet.contains(sym) => classDefToClassType(classesToClasses(sym))
       case _ => {
-        unit.error(NoPosition, "Could not extract type as PureScala. [" + tr + "]")
+        reporter.error(NoPosition, "Could not extract type as PureScala. [" + tr + "]")
         throw ImpureCodeEncounteredException(null)
       }
     }

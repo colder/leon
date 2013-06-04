@@ -15,6 +15,8 @@ trait LeonExtraction extends SubComponent with CodeExtraction {
 
   var program: Option[Program] = None
 
+  val ctx: LeonContext
+
   def newPhase(prev: scala.tools.nsc.Phase): StdPhase = new Phase(prev)
 
   class Phase(prev: scala.tools.nsc.Phase) extends StdPhase(prev) {
