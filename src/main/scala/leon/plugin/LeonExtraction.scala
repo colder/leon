@@ -19,7 +19,7 @@ trait LeonExtraction extends SubComponent with CodeExtraction {
 
   class Phase(prev: scala.tools.nsc.Phase) extends StdPhase(prev) {
     def apply(unit: CompilationUnit): Unit = {
-      program = extractCode(unit)
+      program = new Extraction(unit).extractProgram
     }
   }
 }
