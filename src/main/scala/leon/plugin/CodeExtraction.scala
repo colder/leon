@@ -481,11 +481,11 @@ trait CodeExtraction extends Extractors {
             getOwner(valTree) match {
               case None =>
                 owners += (Variable(newID) -> Some(currentFunDef))
-              case Some(_) =>
-                reporter.error(tr.pos, "Cannot alias array")
-                throw ImpureCodeEncounteredException(tr)
+              case _ =>
+                unsupported(tr, "Cannot alias array")
             }
           }
+
           val restTree = rest match {
             case Some(rst) => {
               varSubsts(vs) = (() => Variable(newID))
@@ -499,7 +499,11 @@ trait CodeExtraction extends Extractors {
           rest = None
           Let(newID, valTree, restTree)
 
-        case dd@ExFunctionDef(n, p, t, b) =>
+        /**
+         * XLang Extractors
+         */
+
+        case dd @ ExFunctionDef(n, p, t, b) =>
           val funDef = extractFunSig(n, p, t).setPosInfo(dd.pos.line, dd.pos.column)
           defsToDefs += (dd.symbol -> funDef)
           val oldMutableVarSubst = mutableVarSubsts.toMap //take an immutable snapshot of the map
@@ -518,22 +522,16 @@ trait CodeExtraction extends Extractors {
 
         case ExVarDef(vs, tpt, bdy) => {
           val binderTpe = extractType(tpt.tpe)
-          //binderTpe match {
-          //  case ArrayType(_) => 
-          //    reporter.error(tree.pos, "Cannot declare array variables, only val are alllowed")
-          //    throw ImpureCodeEncounteredException(tree)
-          //  case _ =>
-          //}
           val newID = FreshIdentifier(vs.name.toString).setType(binderTpe)
           val valTree = extractTree(bdy)
           mutableVarSubsts += (vs -> (() => Variable(newID)))
+
           if(valTree.getType.isInstanceOf[ArrayType]) {
             getOwner(valTree) match {
               case None =>
                 owners += (Variable(newID) -> Some(currentFunDef))
               case Some(_) =>
-                reporter.error(tr.pos, "Cannot alias array")
-                throw ImpureCodeEncounteredException(tr)
+                unsupported(tr, "Cannot alias array")
             }
           }
           val restTree = rest match {
@@ -552,54 +550,33 @@ trait CodeExtraction extends Extractors {
         }
 
         case ExAssign(sym, rhs) => mutableVarSubsts.get(sym) match {
-          case Some(fun) => {
+          case Some(fun) =>
             val Variable(id) = fun()
             val rhsTree = extractTree(rhs)
-            if(rhsTree.getType.isInstanceOf[ArrayType]) {
-              getOwner(rhsTree) match {
-                case None =>
-                case Some(_) =>
-                  reporter.error(tr.pos, "Cannot alias array")
-                  throw ImpureCodeEncounteredException(tr)
-              }
+            if(rhsTree.getType.isInstanceOf[ArrayType] && getOwner(rhsTree).isDefined) {
+              unsupported(tr, "Cannot alias array")
             }
             Assignment(id, rhsTree)
-          }
-          case None => {
-            reporter.error(tr.pos, "Undeclared variable.")
-            throw ImpureCodeEncounteredException(tr)
-          }
+
+          case None =>
+            unsupported(tr, "Undeclared variable.")
         }
-        case wh@ExWhile(cond, body) => {
+
+        case wh @ ExWhile(cond, body) =>
           val condTree = extractTree(cond)
           val bodyTree = extractTree(body)
-          While(condTree, bodyTree).setPosInfo(wh.pos.line,wh.pos.column)
-        }
-        case wh@ExWhileWithInvariant(cond, body, inv) => {
+          While(condTree, bodyTree).setPosInfo(wh.pos)
+
+        case wh @ ExWhileWithInvariant(cond, body, inv) =>
           val condTree = extractTree(cond)
           val bodyTree = extractTree(body)
           val invTree = extractTree(inv)
-          val w = While(condTree, bodyTree).setPosInfo(wh.pos.line,wh.pos.column)
+
+          val w = While(condTree, bodyTree).setPosInfo(wh.pos)
           w.invariant = Some(invTree)
           w
-        }
 
-        case ExInt32Literal(v) => IntLiteral(v).setType(Int32Type)
-        case ExBooleanLiteral(v) => BooleanLiteral(v).setType(BooleanType)
-        case ExUnitLiteral() => UnitLiteral
-        case ExLocally(body) => extractTree(body)
-        case ExTyped(e,tpt) => extractTree(e)
-        case ExIdentifier(sym,tpt) => varSubsts.get(sym) match {
-          case Some(fun) => fun()
-          case None => mutableVarSubsts.get(sym) match {
-            case Some(fun) => fun()
-            case None => {
-              reporter.error(tr.pos, "Unidentified variable.")
-              throw ImpureCodeEncounteredException(tr)
-            }
-          }
-        }
-        case epsi@ExEpsilonExpression(tpe, varSym, predBody) => {
+        case epsi @ ExEpsilonExpression(tpe, varSym, predBody) =>
           val pstpe = extractType(tpe)
           val previousVarSubst: Option[Function0[Expr]] = varSubsts.get(varSym) //save the previous in case of nested epsilon
           varSubsts(varSym) = (() => EpsilonVariable((epsi.pos.line, epsi.pos.column)).setType(pstpe))
@@ -609,13 +586,65 @@ trait CodeExtraction extends Extractors {
             case None => varSubsts.remove(varSym)
           }
           if(containsEpsilon(c1)) {
-            reporter.error(epsi.pos, "Usage of nested epsilon is not allowed.")
-            throw ImpureCodeEncounteredException(epsi)
+            unsupported(epsi, "Usage of nested epsilon is not allowed")
           }
           Epsilon(c1).setType(pstpe).setPosInfo(epsi.pos.line, epsi.pos.column)
+
+        case ExWaypointExpression(tpe, i, tree) =>
+          val pstpe = extractType(tpe)
+          val IntLiteral(ri) = extractTree(i)
+          Waypoint(ri, extractTree(tree)).setType(pstpe)
+
+        case update @ ExUpdate(lhs, index, newValue) =>
+          val lhsRec = extractTree(lhs)
+          lhsRec match {
+            case Variable(_) =>
+            case _ =>
+              unsupported(tr, "Array update only works on variables")
+          }
+
+          getOwner(lhsRec) match {
+            case Some(Some(fd)) if fd != currentFunDef =>
+              unsupported(tr, "cannot update an array that is not defined locally")
+
+            case Some(None) =>
+              unsupported(tr, "cannot update an array that is not defined locally")
+
+            case Some(_) =>
+
+            case None => sys.error("This array: " + lhsRec + " should have had an owner")
+          }
+
+          val indexRec = extractTree(index)
+          val newValueRec = extractTree(newValue)
+          ArrayUpdate(lhsRec, indexRec, newValueRec).setPosInfo(update.pos)
+
+        case ExInt32Literal(v) =>
+          IntLiteral(v)
+
+        case ExBooleanLiteral(v) =>
+          BooleanLiteral(v)
+
+        case ExUnitLiteral() =>
+          UnitLiteral
+
+        case ExLocally(body) =>
+          extractTree(body)
+
+        case ExTyped(e,tpt) =>
+          // TODO: refine type here?
+          extractTree(e)
+
+        case ExIdentifier(sym,tpt) => varSubsts.get(sym) match {
+          case Some(fun) => fun()
+          case None => mutableVarSubsts.get(sym) match {
+            case Some(fun) => fun()
+            case None =>
+              unsupported(tr, "Unidentified variable.")
+          }
         }
 
-        case chs @ ExChooseExpression(args, tpe, body, select) => {
+        case chs @ ExChooseExpression(args, tpe, body, select) =>
           val cTpe  = extractType(tpe)
 
           val vars = args map { case (tpe, sym) =>
@@ -628,282 +657,275 @@ trait CodeExtraction extends Extractors {
 
           val cBody = extractTree(body)
 
-          Choose(vars, cBody).setType(cTpe).setPosInfo(select.pos.line, select.pos.column)
-        }
+          Choose(vars, cBody).setType(cTpe).setPosInfo(select.pos)
 
-        case ExWaypointExpression(tpe, i, tree) => {
-          val pstpe = extractType(tpe)
-          val IntLiteral(ri) = extractTree(i)
-          Waypoint(ri, extractTree(tree)).setType(pstpe)
-        }
-        case ExCaseClassConstruction(tpt, args) => {
-          val cctype = extractType(tpt.tpe)
-          if(!cctype.isInstanceOf[CaseClassType]) {
-            reporter.error(tr.pos, "Construction of a non-case class.")
-            throw ImpureCodeEncounteredException(tr)
+        case ExCaseClassConstruction(tpt, args) =>
+          extractType(tpt.tpe) match {
+            case cct: CaseClassType =>
+              val nargs = args.map(extractTree(_))
+              CaseClass(cct.classDef, nargs).setType(cct)
+
+            case _ =>
+              unsupported(tr, "Construction of a non-case class.")
+
           }
-          val nargs = args.map(extractTree(_))
-          val cct = cctype.asInstanceOf[CaseClassType]
-          CaseClass(cct.classDef, nargs).setType(cct)
-        }
 
-        case ExAnd(l, r) => And(extractTree(l), extractTree(r)).setType(BooleanType)
-        case ExOr(l, r) => Or(extractTree(l), extractTree(r)).setType(BooleanType)
-        case ExNot(e) => Not(extractTree(e)).setType(BooleanType)
-        case ExUMinus(e) => UMinus(extractTree(e)).setType(Int32Type)
-        case ExPlus(l, r) => Plus(extractTree(l), extractTree(r)).setType(Int32Type)
-        case ExMinus(l, r) => Minus(extractTree(l), extractTree(r)).setType(Int32Type)
-        case ExTimes(l, r) => Times(extractTree(l), extractTree(r)).setType(Int32Type)
-        case ExDiv(l, r) => Division(extractTree(l), extractTree(r)).setType(Int32Type)
-        case ExMod(l, r) => Modulo(extractTree(l), extractTree(r)).setType(Int32Type)
-        case ExEquals(l, r) => {
+        case ExAnd(l, r)           => And(extractTree(l), extractTree(r))
+        case ExOr(l, r)            => Or(extractTree(l), extractTree(r))
+        case ExNot(e)              => Not(extractTree(e))
+        case ExUMinus(e)           => UMinus(extractTree(e))
+        case ExPlus(l, r)          => Plus(extractTree(l), extractTree(r))
+        case ExMinus(l, r)         => Minus(extractTree(l), extractTree(r))
+        case ExTimes(l, r)         => Times(extractTree(l), extractTree(r))
+        case ExDiv(l, r)           => Division(extractTree(l), extractTree(r))
+        case ExMod(l, r)           => Modulo(extractTree(l), extractTree(r))
+        case ExNotEquals(l, r)     => Not(Equals(extractTree(l), extractTree(r)))
+        case ExGreaterThan(l, r)   => GreaterThan(extractTree(l), extractTree(r))
+        case ExGreaterEqThan(l, r) => GreaterEquals(extractTree(l), extractTree(r))
+        case ExLessThan(l, r)      => LessThan(extractTree(l), extractTree(r))
+        case ExLessEqThan(l, r)    => LessEquals(extractTree(l), extractTree(r))
+        case ExEquals(l, r) =>
           val rl = extractTree(l)
           val rr = extractTree(r)
-          ((rl.getType,rr.getType) match {
-            case (SetType(_), SetType(_)) => SetEquals(rl, rr)
-            case (BooleanType, BooleanType) => Iff(rl, rr)
-            case (_, _) => Equals(rl, rr)
-          }).setType(BooleanType) 
-        }
-        case ExNotEquals(l, r) => Not(Equals(extractTree(l), extractTree(r)).setType(BooleanType)).setType(BooleanType)
-        case ExGreaterThan(l, r) => GreaterThan(extractTree(l), extractTree(r)).setType(BooleanType)
-        case ExGreaterEqThan(l, r) => GreaterEquals(extractTree(l), extractTree(r)).setType(BooleanType)
-        case ExLessThan(l, r) => LessThan(extractTree(l), extractTree(r)).setType(BooleanType)
-        case ExLessEqThan(l, r) => LessEquals(extractTree(l), extractTree(r)).setType(BooleanType)
-        case ExFiniteSet(tt, args) => {
+
+          (rl.getType, rr.getType) match {
+            case (SetType(_), SetType(_)) =>
+              SetEquals(rl, rr)
+
+            case (BooleanType, BooleanType) =>
+              Iff(rl, rr)
+
+            case (rt, lt) if isSubtypeOf(rt, lt) || isSubtypeOf(lt, rt) =>
+              Equals(rl, rr)
+
+            case (rt, lt) =>
+              unsupported(tr, "Invalid comparison: (_: "+rt+") == (_: "+lt+")")
+          }
+
+        case ExFiniteSet(tt, args)  =>
           val underlying = extractType(tt.tpe)
           FiniteSet(args.map(extractTree(_))).setType(SetType(underlying))
-        }
-        case ExFiniteMultiset(tt, args) => {
+
+        case ExFiniteMultiset(tt, args) =>
           val underlying = extractType(tt.tpe)
           FiniteMultiset(args.map(extractTree(_))).setType(MultisetType(underlying))
-        }
-        case ExEmptySet(tt) => {
+
+        case ExEmptySet(tt) =>
           val underlying = extractType(tt.tpe)
           FiniteSet(Seq()).setType(SetType(underlying))
-        }
-        case ExEmptyMultiset(tt) => {
+
+        case ExEmptyMultiset(tt) =>
           val underlying = extractType(tt.tpe)
           EmptyMultiset(underlying).setType(MultisetType(underlying))
-        }
-        case ExEmptyMap(ft, tt) => {
+
+        case ExEmptyMap(ft, tt) =>
           val fromUnderlying = extractType(ft.tpe)
           val toUnderlying   = extractType(tt.tpe)
           val tpe = MapType(fromUnderlying, toUnderlying)
 
           FiniteMap(Seq()).setType(tpe)
-        }
-        case ExLiteralMap(ft, tt, elems) => {
+
+        case ExLiteralMap(ft, tt, elems) =>
           val fromUnderlying = extractType(ft.tpe)
           val toUnderlying   = extractType(tt.tpe)
           val tpe = MapType(fromUnderlying, toUnderlying)
 
-          val singletons: Seq[(Expr, Expr)] = elems.collect { case ExTuple(tpes, trees) if (trees.size == 2) =>
-            (extractTree(trees(0)), extractTree(trees(1)))
+          val singletons: Seq[(Expr, Expr)] = elems.collect {
+            case ExTuple(tpes, trees) if (trees.size == 2) =>
+              (extractTree(trees(0)), extractTree(trees(1)))
           }
 
           if (singletons.size != elems.size) {
-            reporter.error(tr.pos, "Some map elements could not be extracted as Tuple2")
-            throw ImpureCodeEncounteredException(tr)
+            unsupported(tr, "Some map elements could not be extracted as Tuple2")
           }
 
           FiniteMap(singletons).setType(tpe)
-        }
 
-        case ExSetMin(t) => {
+        case ExSetMin(t) =>
           val set = extractTree(t)
-          if(!set.getType.isInstanceOf[SetType]) {
-            reporter.error(t.pos, "Min should be computed on a set.")
-            throw ImpureCodeEncounteredException(tr)
+          set.getType match {
+            case SetType(base) =>
+              SetMin(set).setType(base)
+
+            case _ =>
+              unsupported(t, "Min should be computer on a set.")
           }
-          SetMin(set).setType(set.getType.asInstanceOf[SetType].base)
-        }
-        case ExSetMax(t) => {
+
+        case ExSetMax(t) =>
           val set = extractTree(t)
-          if(!set.getType.isInstanceOf[SetType]) {
-            reporter.error(t.pos, "Max should be computed on a set.")
-            throw ImpureCodeEncounteredException(tr)
+          set.getType match {
+            case SetType(base) =>
+              SetMax(set).setType(base)
+
+            case _ =>
+              unsupported(t, "Max should be computer on a set.")
           }
-          SetMax(set).setType(set.getType.asInstanceOf[SetType].base)
-        }
-        case ExUnion(t1,t2) => {
+
+        case ExUnion(t1,t2) =>
           val rl = extractTree(t1)
           val rr = extractTree(t2)
-          rl.getType match {
-            case s @ SetType(_) => SetUnion(rl, rr).setType(s)
-            case m @ MultisetType(_) => MultisetUnion(rl, rr).setType(m)
-            case _ => {
-              reporter.error(tr.pos, "Union of non set/multiset expressions.")
-              throw ImpureCodeEncounteredException(tr)
-            }
+
+          (rl.getType, rr.getType) match {
+            case (SetType(b1), SetType(b2)) if b1 == b2 =>
+              SetUnion(rl, rr).setType(SetType(b1))
+
+            case (MultisetType(b1), MultisetType(b2)) if b1 == b2 =>
+              MultisetUnion(rl, rr).setType(SetType(b1))
+
+            case (lt, rt) =>
+              unsupported(tr, "Unsupported union between "+lt+" and "+rt)
           }
-        }
-        case ExIntersection(t1,t2) => {
+
+        case ExIntersection(t1,t2) =>
           val rl = extractTree(t1)
           val rr = extractTree(t2)
-          rl.getType match {
-            case s @ SetType(_) => SetIntersection(rl, rr).setType(s)
-            case m @ MultisetType(_) => MultisetIntersection(rl, rr).setType(m)
-            case _ => {
-              reporter.error(tr.pos, "Intersection of non set/multiset expressions.")
-              throw ImpureCodeEncounteredException(tr)
-            }
+
+          (rl.getType, rr.getType) match {
+            case (SetType(b1), SetType(b2)) if b1 == b2 =>
+              SetIntersection(rl, rr).setType(SetType(b1))
+
+            case (MultisetType(b1), MultisetType(b2)) if b1 == b2 =>
+              MultisetIntersection(rl, rr).setType(SetType(b1))
+
+            case (lt, rt) =>
+              unsupported(tr, "Unsupported intersection between "+lt+" and "+rt)
           }
-        }
-        case ExSetContains(t1,t2) => {
+
+        case ExSetContains(t1,t2) =>
           val rl = extractTree(t1)
           val rr = extractTree(t2)
-          rl.getType match {
-            case s @ SetType(_) => ElementOfSet(rr, rl)
-            case _ => {
-              reporter.error(tr.pos, ".contains on non set expression.")
-              throw ImpureCodeEncounteredException(tr)
-            }
+
+          (rl.getType, rr.getType) match {
+            case (SetType(base), elem) if isSubtypeOf(elem, base) =>
+              ElementOfSet(rr, rl)
+
+            case (lt, rt) =>
+              unsupported(tr, "Invalid "+lt+".contains("+rt+")")
           }
-        }
-        case ExSetSubset(t1,t2) => {
+
+        case ExSetSubset(t1,t2) =>
           val rl = extractTree(t1)
           val rr = extractTree(t2)
-          rl.getType match {
-            case s @ SetType(_) => SubsetOf(rl, rr)
-            case _ => {
-              reporter.error(tr.pos, "Subset on non set expression.")
-              throw ImpureCodeEncounteredException(tr)
-            }
+
+          (rl.getType, rr.getType) match {
+            case (SetType(base1), SetType(base2)) if base2 == base1 =>
+              SubsetOf(rl, rr)
+
+            case (lt, rt) =>
+              unsupported(tr, "Invalid "+lt+" isSubsetOf "+rt+"")
           }
-        }
-        case ExSetMinus(t1,t2) => {
+
+        case ExSetMinus(t1,t2) =>
           val rl = extractTree(t1)
           val rr = extractTree(t2)
-          rl.getType match {
-            case s @ SetType(_) => SetDifference(rl, rr).setType(s)
-            case m @ MultisetType(_) => MultisetDifference(rl, rr).setType(m)
-            case _ => {
-              reporter.error(tr.pos, "Difference of non set/multiset expressions.")
-              throw ImpureCodeEncounteredException(tr)
-            }
+
+          (rl.getType, rr.getType) match {
+            case (SetType(base1), SetType(base2)) if base2 == base1 =>
+              SetDifference(rl, rr).setType(SetType(base1))
+
+            case (MultisetType(base1), MultisetType(base2)) if base2 == base1 =>
+              MultisetDifference(rl, rr).setType(MultisetType(base1))
+
+            case (lt, rt) =>
+              unsupported(tr, "Invalid "+lt+" -- "+rt+"")
           }
-        } 
-        case ExSetCard(t) => {
+
+        case ExSetCard(t) =>
           val rt = extractTree(t)
           rt.getType match {
-            case s @ SetType(_) => SetCardinality(rt)
-            case m @ MultisetType(_) => MultisetCardinality(rt)
-            case _ => {
-              reporter.error(tr.pos, "Cardinality of non set/multiset expressions.")
-              throw ImpureCodeEncounteredException(tr)
-            }
+            case SetType(_) =>
+              SetCardinality(rt)
+
+            case MultisetType(_) =>
+              MultisetCardinality(rt)
+
+            case _ =>
+              unsupported(tr, "Cardinality of non set/multiset expressions.")
           }
-        }
-        case ExMultisetToSet(t) => {
+
+        case ExMultisetToSet(t) =>
           val rt = extractTree(t)
+
           rt.getType match {
-            case m @ MultisetType(u) => MultisetToSet(rt).setType(SetType(u))
-            case _ => {
-              reporter.error(tr.pos, "toSet can only be applied to multisets.")
-              throw ImpureCodeEncounteredException(tr)
-            }
+            case MultisetType(u) =>
+              MultisetToSet(rt).setType(SetType(u))
+
+            case _ =>
+              unsupported(tr, "toSet can only be applied to multisets.")
           }
-        }
-        case up@ExUpdated(m,f,t) => {
+
+        case up @ ExUpdated(m, f, t) =>
           val rm = extractTree(m)
           val rf = extractTree(f)
           val rt = extractTree(t)
+
           rm.getType match {
-            case MapType(ft, tt) => {
-              MapUnion(rm, FiniteMap(Seq((rf, rt))).setType(rm.getType)).setType(rm.getType)
-            }
-            case ArrayType(bt) => {
-              ArrayUpdated(rm, rf, rt).setType(rm.getType).setPosInfo(up.pos.line, up.pos.column)
-            }
-            case _ => {
-              reporter.error(tr.pos, "updated can only be applied to maps.")
-              throw ImpureCodeEncounteredException(tr)
-            }
+            case t @ MapType(ft, tt) =>
+              MapUnion(rm, FiniteMap(Seq((rf, rt))).setType(t)).setType(t)
+
+            case t @ ArrayType(bt) =>
+              ArrayUpdated(rm, rf, rt).setType(t).setPosInfo(up.pos)
+
+            case _ =>
+              unsupported(tr, "updated can only be applied to maps.")
           }
-        }
-        case ExMapIsDefinedAt(m,k) => {
+
+        case ExMapIsDefinedAt(m,k) =>
           val rm = extractTree(m)
           val rk = extractTree(k)
           MapIsDefinedAt(rm, rk)
-        }
 
-        case ExPlusPlusPlus(t1,t2) => {
+        case ExPlusPlusPlus(t1,t2) =>
           val rl = extractTree(t1)
           val rr = extractTree(t2)
           MultisetPlus(rl, rr).setType(rl.getType)
-        }
-        case app@ExApply(lhs,args) => {
+
+        case app @ ExApply(lhs,args) =>
           val rlhs = extractTree(lhs)
           val rargs = args map extractTree
+
           rlhs.getType match {
-            case MapType(_,tt) => 
+            case MapType(_,tt) =>
               assert(rargs.size == 1)
               MapGet(rlhs, rargs.head).setType(tt).setPosInfo(app.pos.line, app.pos.column)
-            case ArrayType(bt) => {
+
+            case ArrayType(bt) =>
               assert(rargs.size == 1)
               ArraySelect(rlhs, rargs.head).setType(bt).setPosInfo(app.pos.line, app.pos.column)
-            }
-            case _ => {
-              reporter.error(tr.pos, "apply on unexpected type")
-              throw ImpureCodeEncounteredException(tr)
-            }
+
+            case _ =>
+              unsupported(tr, "apply on unexpected type")
           }
-        }
-        // for now update only occurs on Array. later we might have to distinguished depending on the type of the lhs
-        case update@ExUpdate(lhs, index, newValue) => { 
-          val lhsRec = extractTree(lhs)
-          lhsRec match {
-            case Variable(_) =>
-            case _ => {
-              reporter.error(tr.pos, "array update only works on variables")
-              throw ImpureCodeEncounteredException(tr)
-            }
-          }
-          getOwner(lhsRec) match {
-            case Some(Some(fd)) if fd != currentFunDef => 
-              reporter.error(tr.pos, "cannot update an array that is not defined locally")
-              throw ImpureCodeEncounteredException(tr)
-            case Some(None) =>
-              reporter.error(tr.pos, "cannot update an array that is not defined locally")
-              throw ImpureCodeEncounteredException(tr)
-            case Some(_) =>
-            case None => sys.error("This array: " + lhsRec + " should have had an owner")
-          }
-          val indexRec = extractTree(index)
-          val newValueRec = extractTree(newValue)
-          ArrayUpdate(lhsRec, indexRec, newValueRec).setPosInfo(update.pos.line, update.pos.column)
-        }
-        case ExArrayLength(t) => {
+
+        case ExArrayLength(t) =>
           val rt = extractTree(t)
           ArrayLength(rt)
-        }
-        case ExArrayClone(t) => {
+
+        case ExArrayClone(t) =>
           val rt = extractTree(t)
           ArrayClone(rt)
-        }
-        case ExArrayFill(baseType, length, defaultValue) => {
+
+        case ExArrayFill(baseType, length, defaultValue) =>
           val underlying = extractType(baseType.tpe)
           val lengthRec = extractTree(length)
           val defaultValueRec = extractTree(defaultValue)
           ArrayFill(lengthRec, defaultValueRec).setType(ArrayType(underlying))
-        }
-        case ExIfThenElse(t1,t2,t3) => {
+
+        case ExIfThenElse(t1,t2,t3) =>
           val r1 = extractTree(t1)
           if(containsLetDef(r1)) {
-            reporter.error(t1.pos, "Condition of if-then-else expression should not contain nested function definition")
-            throw ImpureCodeEncounteredException(t1)
+            unsupported(t1, "Condition of if-then-else expression should not contain nested function definition")
           }
           val r2 = extractTree(t2)
           val r3 = extractTree(t3)
           val lub = leastUpperBound(r2.getType, r3.getType)
           lub match {
-            case Some(lub) => IfExpr(r1, r2, r3).setType(lub)
+            case Some(lub) =>
+              IfExpr(r1, r2, r3).setType(lub)
+
             case None =>
-              reporter.error(tr.pos, "Both branches of ifthenelse have incompatible types")
-              throw ImpureCodeEncounteredException(t1)
+              unsupported(tr, "Both branches of ifthenelse have incompatible types")
           }
-        }
 
         case ExIsInstanceOf(tt, cc) => {
           val ccRec = extractTree(cc)
@@ -951,8 +973,7 @@ trait CodeExtraction extends Extractors {
 
         // default behaviour is to complain :)
         case _ =>
-          reporter.error(tr.pos, "Could not extract as PureScala.")
-          throw ImpureCodeEncounteredException(tr)
+          unsupported(tr, "Could not extract as PureScala.")
       }
 
       rest match {
@@ -1007,42 +1028,43 @@ trait CodeExtraction extends Extractors {
         unsupported("Could not extract type as PureScala: ["+tpt+"]")
     }
 
-    def extractProgram: Option[Program] = {
-      val topLevelObjDef = extractTopLevelDef
-
-      val programName: Identifier = unit.body match {
-        case PackageDef(name, _) => FreshIdentifier(name.toString)
-        case _                   => FreshIdentifier("<program>")
+    private def getReturnedExpr(expr: Expr): Seq[Expr] = expr match {
+      case Let(_, _, rest) => getReturnedExpr(rest)
+      case LetVar(_, _, rest) => getReturnedExpr(rest)
+      case LeonBlock(_, rest) => getReturnedExpr(rest)
+      case IfExpr(_, then, elze) => getReturnedExpr(then) ++ getReturnedExpr(elze)
+      case MatchExpr(_, cses) => cses.flatMap{
+        case SimpleCase(_, rhs) => getReturnedExpr(rhs)
+        case GuardedCase(_, _, rhs) => getReturnedExpr(rhs)
       }
-
-      topLevelObjDef.map(obj => Program(programName, obj))
+      case _ => Seq(expr)
     }
-  }
 
-  def getReturnedExpr(expr: Expr): Seq[Expr] = expr match {
-    case Let(_, _, rest) => getReturnedExpr(rest)
-    case LetVar(_, _, rest) => getReturnedExpr(rest)
-    case LeonBlock(_, rest) => getReturnedExpr(rest)
-    case IfExpr(_, then, elze) => getReturnedExpr(then) ++ getReturnedExpr(elze)
-    case MatchExpr(_, cses) => cses.flatMap{
-      case SimpleCase(_, rhs) => getReturnedExpr(rhs)
-      case GuardedCase(_, _, rhs) => getReturnedExpr(rhs)
+    def getOwner(exprs: Seq[Expr]): Option[Option[FunDef]] = {
+      val exprOwners: Seq[Option[Option[FunDef]]] = exprs.map(owners.get(_))
+      if(exprOwners.exists(_ == None))
+        None
+      else if(exprOwners.exists(_ == Some(None)))
+        Some(None)
+      else if(exprOwners.exists(o1 => exprOwners.exists(o2 => o1 != o2)))
+        Some(None)
+      else
+        exprOwners(0)
     }
-    case _ => Seq(expr)
-  }
 
-  def getOwner(exprs: Seq[Expr]): Option[Option[FunDef]] = {
-    val exprOwners: Seq[Option[Option[FunDef]]] = exprs.map(owners.get(_))
-    if(exprOwners.exists(_ == None))
-      None
-    else if(exprOwners.exists(_ == Some(None)))
-      Some(None)
-    else if(exprOwners.exists(o1 => exprOwners.exists(o2 => o1 != o2)))
-      Some(None)
-    else
-      exprOwners(0)
-  }
+    def getOwner(expr: Expr): Option[Option[FunDef]] = getOwner(getReturnedExpr(expr))
 
-  def getOwner(expr: Expr): Option[Option[FunDef]] = getOwner(getReturnedExpr(expr))
+      def extractProgram: Option[Program] = {
+        val topLevelObjDef = extractTopLevelDef
+
+        val programName: Identifier = unit.body match {
+          case PackageDef(name, _) => FreshIdentifier(name.toString)
+          case _                   => FreshIdentifier("<program>")
+        }
+
+        topLevelObjDef.map(obj => Program(programName, obj))
+      }
+    }
+
 
 }
