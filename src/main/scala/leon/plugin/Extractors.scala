@@ -16,15 +16,23 @@ trait Extractors {
   protected lazy val tuple3Sym: Symbol = definitions.getClass("scala.Tuple3")
   protected lazy val tuple4Sym: Symbol = definitions.getClass("scala.Tuple4")
   protected lazy val tuple5Sym: Symbol = definitions.getClass("scala.Tuple5")
-  private lazy val setTraitSym = definitions.getClass("scala.collection.immutable.Set")
-  private lazy val mapTraitSym = definitions.getClass("scala.collection.immutable.Map")
+  private lazy val setTraitSym      = definitions.getClass("scala.collection.immutable.Set")
+  private lazy val mapTraitSym      = definitions.getClass("scala.collection.immutable.Map")
   private lazy val multisetTraitSym = definitions.getClass("scala.collection.immutable.Multiset")
-  private lazy val optionClassSym = definitions.getClass("scala.Option")
+  private lazy val optionClassSym   = definitions.getClass("scala.Option")
+  private lazy val arraySym         = definitions.getClass("scala.Array")
+
+  def isArrayClassSym(sym: Symbol): Boolean = sym == arraySym
 
   object ExtractorHelpers {
     object ExIdNamed {
       def unapply(id: Ident): Option[String] = Some(id.toString)
     }
+
+    object ExHasType {
+      def unapply(tr: Tree): Option[(Tree, Symbol)] = Some((tr, tr.tpe.typeSymbol))
+    }
+
     object ExNamed {
       def unapply(name: Name): Option[String] = Some(name.toString)
     }
@@ -171,29 +179,12 @@ trait Extractors {
   object ExpressionExtractors {
     import ExtractorHelpers._
 
-    //object ExLocalFunctionDef {
-    //  def unapply(tree: Block): Option[(DefDef,String,Seq[ValDef],Tree,Tree,Tree)] = tree match {
-    //    case Block((dd @ DefDef(_, name, tparams, vparamss, tpt, rhs)) :: rest, expr) if(tparams.isEmpty && vparamss.size == 1 && name != nme.CONSTRUCTOR) => {
-    //      if(rest.isEmpty)
-    //        Some((dd,name.toString, vparamss(0), tpt, rhs, expr))
-    //      else
-    //        Some((dd,name.toString, vparamss(0), tpt, rhs, Block(rest, expr)))
-    //    } 
-    //    case _ => None
-    //  }
-    //}
-
-
     object ExEpsilonExpression {
       def unapply(tree: Apply) : Option[(Type, Symbol, Tree)] = tree match {
         case Apply(
-              TypeApply(Select(Select(funcheckIdent, utilsName), epsilonName), typeTree :: Nil),
-              Function((vd @ ValDef(_, _, _, EmptyTree)) :: Nil, predicateBody) :: Nil) => {
-          if (utilsName.toString == "Utils" && epsilonName.toString == "epsilon")
+              TypeApply(ExSelected("leon", "Utils", "epsilon"), typeTree :: Nil),
+              Function((vd @ ValDef(_, _, _, EmptyTree)) :: Nil, predicateBody) :: Nil) =>
             Some((typeTree.tpe, vd.symbol, predicateBody))
-          else 
-            None
-        }
         case _ => None
       }
     }
@@ -210,13 +201,9 @@ trait Extractors {
     object ExChooseExpression {
       def unapply(tree: Apply) : Option[(List[(Type, Symbol)], Type, Tree, Tree)] = tree match {
         case a @ Apply(
-              TypeApply(Select(s @ Select(funcheckIdent, utilsName), chooseName), types),
-              Function(vds, predicateBody) :: Nil) => {
-          if (utilsName.toString == "Utils" && chooseName.toString == "choose")
+              TypeApply(s @ ExSelected("leon", "Utils", "choose"), types),
+              Function(vds, predicateBody) :: Nil) =>
             Some(((types.map(_.tpe) zip vds.map(_.symbol)).toList, a.tpe, predicateBody, s))
-          else 
-            None
-        }
         case _ => None
       }
     }
@@ -224,13 +211,9 @@ trait Extractors {
     object ExWaypointExpression {
       def unapply(tree: Apply) : Option[(Type, Tree, Tree)] = tree match {
         case Apply(
-              TypeApply(Select(Select(funcheckIdent, utilsName), waypoint), typeTree :: Nil),
-              List(i, expr)) => {
-          if (utilsName.toString == "Utils" && waypoint.toString == "waypoint")
+              TypeApply(ExSelected("leon", "Utils", "waypoint"), typeTree :: Nil),
+              List(i, expr)) =>
             Some((typeTree.tpe, i, expr))
-          else 
-            None
-        }
         case _ => None
       }
     }
@@ -266,6 +249,7 @@ trait Extractors {
         case _ => None
       }
     }
+
     object ExWhileWithInvariant {
       def unapply(tree: Apply): Option[(Tree, Tree, Tree)] = tree match {
         case Apply(
@@ -276,6 +260,7 @@ trait Extractors {
         case _ => None
       }
     }
+
     object ExTuple {
       def unapply(tree: Apply): Option[(Seq[Type], Seq[Tree])] = tree match {
         case Apply(
@@ -644,14 +629,6 @@ trait Extractors {
       }
     }
 
-    // object ExFiniteMap {
-    //   def unapply(tree: Apply): Option[(Tree,Tree,List[Tree])] = tree match {
-    //     case Apply(TypeApply(Select(Select(Select(Select(Ident(s), collectionName), immutableName), mapName), applyName), List(fromTypeTree, toTypeTree)), args) if (collectionName.toString == "collection" && immutableName.toString == "immutable" && mapName.toString == "Map" && applyName.toString == "apply") => Some((fromTypeTree, toTypeTree, args))
-    //     case Apply(TypeApply(Select(Select(Select(This(scalaName), predefName), mapName), applyName), List(fromTypeTree, toTypeTree)), args) if (scalaName.toString == "scala" && predefName.toString == "Predef" && mapName.toString == "Map" && applyName.toString == "apply") => Some((fromTypeTree, toTypeTree, args))
-    //     case _ => None
-    //   }
-    // }
-
     object ExUnion {
       def unapply(tree: Apply): Option[(Tree,Tree)] = tree match {
         case Apply(Select(lhs, n), List(rhs)) if (n == encode("++")/*nme.PLUSPLUS*/) => Some((lhs,rhs))
@@ -743,14 +720,14 @@ trait Extractors {
 
     object ExArrayLength {
       def unapply(tree: Select): Option[Tree] = tree match {
-        case Select(t, n) if (n.toString == "length") => Some(t)
+        case Select(ExHasType(t, `arraySym`), n) if n.toString == "length" => Some(t)
         case _ => None
       }
     }
 
     object ExArrayClone {
       def unapply(tree: Apply): Option[Tree] = tree match {
-        case Apply(Select(t, n), List()) if (n.toString == "clone") => Some(t)
+        case Apply(Select(ExHasType(t, `arraySym`), n), List()) if n.toString == "clone" => Some(t)
         case _ => None
       }
     }
@@ -761,18 +738,14 @@ trait Extractors {
         case Apply(
                Apply(
                  Apply(
-                   TypeApply(
-                     Select(Select(Ident(scala), arrayObject), fillMethod),
-                     baseType :: Nil
-                   ),
+                   TypeApply(ExSelected("scala", "Array", "fill"), baseType :: Nil),
                    length :: Nil
                  ),
                  defaultValue :: Nil
                ),
                manifest
-             ) if(scala.toString == "scala" &&
-                  arrayObject.toString == "Array" &&
-                  fillMethod.toString == "fill") => Some((baseType, length, defaultValue))
+             ) =>
+            Some((baseType, length, defaultValue))
         case _ => None
       }
     }

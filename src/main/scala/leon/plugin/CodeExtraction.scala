@@ -34,10 +34,6 @@ trait CodeExtraction extends Extractors {
   private lazy val someClassSym       = definitions.getClass("scala.Some")
   private lazy val function1TraitSym  = definitions.getClass("scala.Function1")
 
-  private lazy val arraySym           = definitions.getClass("scala.Array")
-
-  def isArrayClassSym(sym: Symbol): Boolean = sym == arraySym
-
   def isTuple2(sym : Symbol) : Boolean = sym == tuple2Sym
   def isTuple3(sym : Symbol) : Boolean = sym == tuple3Sym
   def isTuple4(sym : Symbol) : Boolean = sym == tuple4Sym
@@ -347,6 +343,7 @@ trait CodeExtraction extends Extractors {
       throw new ImpureCodeEncounteredException(null)
     }
     def unsupported(tr: Tree, msg: String): Nothing = {
+      reporter.error(tr.pos, tr.toString)
       reporter.error(tr.pos, msg)
       throw new ImpureCodeEncounteredException(tr)
     }
@@ -413,6 +410,8 @@ trait CodeExtraction extends Extractors {
 
     private def extractTree(tr: Tree): Expr = {
       val (current, tmpRest) = tr match {
+        case Block(Block(e :: es1, l1) :: es2, l2) =>
+          (e, Some(Block(es1 ++ Seq(l1) ++ es2, l2)))
         case Block(e :: Nil, last) =>
           (e, Some(last))
         case Block(e :: es, last) =>
@@ -433,30 +432,26 @@ trait CodeExtraction extends Extractors {
               unsupported(tr, "Unknown case class "+sym.name)
           }
 
-        case ExParameterlessMethodCall(t,n) =>
+        case ExParameterlessMethodCall(t,n) if extractTree(t).getType.isInstanceOf[CaseClassType] =>
           val selector = extractTree(t)
           val selType = selector.getType
 
-          if(!selType.isInstanceOf[CaseClassType]) {
-            unsupported(tr, "Calling a method on a non-case-class?")
-          } else {
-            val selDef: CaseClassDef = selType.asInstanceOf[CaseClassType].classDef
+          val selDef: CaseClassDef = selType.asInstanceOf[CaseClassType].classDef
 
-            val fieldID = selDef.fields.find(_.id.name == n.toString) match {
-              case None =>
-                unsupported(tr, "Invalid method or field invocation (not a case class arg?)")
+          val fieldID = selDef.fields.find(_.id.name == n.toString) match {
+            case None =>
+              unsupported(tr, "Invalid method or field invocation (not a case class arg?)")
 
-              case Some(vd) =>
-                vd.id
-            }
-
-            CaseClassSelector(selDef, selector, fieldID).setType(fieldID.getType)
+            case Some(vd) =>
+              vd.id
           }
+
+          CaseClassSelector(selDef, selector, fieldID).setType(fieldID.getType)
 
         case ExTuple(tpes, exprs) =>
           val tupleExprs = exprs.map(e => extractTree(e))
           val tupleType = TupleType(tupleExprs.map(expr => expr.getType))
-          Tuple(tupleExprs).setType(tupleType)
+          Tuple(tupleExprs)
 
         case ExErrorExpression(str, tpe) =>
           Error(str).setType(extractType(tpe))
@@ -466,7 +461,7 @@ trait CodeExtraction extends Extractors {
 
           tupleExpr.getType match {
             case TupleType(tpes) if tpes.size >= index =>
-              TupleSelect(tupleExpr, index).setType(tpes(index-1))
+              TupleSelect(tupleExpr, index)
 
             case _ =>
               unsupported(tr, "Invalid tupple access")
@@ -657,13 +652,13 @@ trait CodeExtraction extends Extractors {
 
           val cBody = extractTree(body)
 
-          Choose(vars, cBody).setType(cTpe).setPosInfo(select.pos)
+          Choose(vars, cBody).setPosInfo(select.pos)
 
         case ExCaseClassConstruction(tpt, args) =>
           extractType(tpt.tpe) match {
             case cct: CaseClassType =>
               val nargs = args.map(extractTree(_))
-              CaseClass(cct.classDef, nargs).setType(cct)
+              CaseClass(cct.classDef, nargs)
 
             case _ =>
               unsupported(tr, "Construction of a non-case class.")
@@ -961,19 +956,19 @@ trait CodeExtraction extends Extractors {
             throw ImpureCodeEncounteredException(tr)
           }
           val fd = defsToDefs(sy)
-          FunctionInvocation(fd, ar.map(extractTree(_))).setType(fd.returnType).setPosInfo(lc.pos.line,lc.pos.column) 
+          FunctionInvocation(fd, ar.map(extractTree(_))).setType(fd.returnType).setPosInfo(lc.pos.line,lc.pos.column)
         }
 
-        case pm @ ExPatternMatching(sel, cses) => {
+        case pm @ ExPatternMatching(sel, cses) =>
           val rs = extractTree(sel)
           val rc = cses.map(extractMatchCase(_))
           val rt: LeonType = rc.map(_.rhs.getType).reduceLeft(leastUpperBound(_,_).get)
           MatchExpr(rs, rc).setType(rt).setPosInfo(pm.pos.line,pm.pos.column)
-        }
+
 
         // default behaviour is to complain :)
         case _ =>
-          unsupported(tr, "Could not extract as PureScala.")
+          unsupported(tr, "Could not extract as PureScala")
       }
 
       rest match {
