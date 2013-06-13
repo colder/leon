@@ -2,6 +2,8 @@
 
 package purescala.z3plugins.bapa
 
+import scala.language.implicitConversions
+
 import z3.scala._
 
 object AST {
