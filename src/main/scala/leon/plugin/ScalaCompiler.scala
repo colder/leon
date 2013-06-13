@@ -18,9 +18,11 @@ class ScalaCompiler(settings : NSCSettings, ctx: LeonContext) extends Global(set
       analyzer.namerFactory   -> "resolve names, attach symbols to named trees",
       analyzer.packageObjects -> "load package objects",
       analyzer.typerFactory   -> "the meat and potatoes: type the trees",
+      patmat                  -> "translate match expressions",
       superAccessors          -> "add super accessors in traits and nested classes",
+      extensionMethods        -> "add extension methods for inline classes",
       pickler                 -> "serialize symbol tables",
-      refchecks               -> "reference and override checking, translate nested objects",
+      refChecks               -> "reference/override checking, translate nested objects",
       leonExtraction          -> "extracts leon trees out of scala trees"
     )
     phs foreach { phasesSet += _._1 }

@@ -24,7 +24,7 @@ object AST {
     def seteq(tree: Tree) = Op(SETEQ, Seq(this, tree))
     def subseteq(tree: Tree) = Op(SUBSETEQ, Seq(this, tree))
     def +(tree: Tree) = Op(ADD, Seq(this, tree))
-//    def ifThenElse(then: Tree, elze: Tree) = Op(ITE, Seq(this, then, elze))
+//    def ifThenElse(thenn: Tree, elze: Tree) = Op(ITE, Seq(this, thenn, elze))
     def card = Op(CARD, Seq(this))
     def ++(tree: Tree) = Op(UNION, Seq(this, tree))
     def **(tree: Tree) = Op(INTER, Seq(this, tree))

@@ -6,8 +6,10 @@ package plugin
 import scala.tools.nsc._
 import scala.tools.nsc.plugins._
 
+import scala.language.implicitConversions
+
 import purescala.Definitions._
-import purescala.Trees._
+import purescala.Trees.{Expr => LeonExpr, _}
 import xlang.Trees.{Block => LeonBlock, _}
 import xlang.TreeOps._
 import purescala.TypeTrees.{TypeTree => LeonType, _}
@@ -22,17 +24,6 @@ trait CodeExtraction extends Extractors {
   import StructuralExtractors._
   import ExpressionExtractors._
   import ExtractorHelpers._
-
-  private lazy val setTraitSym = definitions.getClass("scala.collection.immutable.Set")
-  private lazy val mapTraitSym = definitions.getClass("scala.collection.immutable.Map")
-  private lazy val multisetTraitSym = try {
-    definitions.getClass("scala.collection.immutable.Multiset")
-  } catch {
-    case _ => null
-  }
-  private lazy val optionClassSym     = definitions.getClass("scala.Option")
-  private lazy val someClassSym       = definitions.getClass("scala.Some")
-  private lazy val function1TraitSym  = definitions.getClass("scala.Function1")
 
   def isTuple2(sym : Symbol) : Boolean = sym == tuple2Sym
   def isTuple3(sym : Symbol) : Boolean = sym == tuple3Sym
@@ -67,10 +58,10 @@ trait CodeExtraction extends Extractors {
     new ScalaPos(p)
   }
 
-  private val mutableVarSubsts: scala.collection.mutable.Map[Symbol,Function0[Expr]] =
-    scala.collection.mutable.Map.empty[Symbol,Function0[Expr]]
-  private val varSubsts: scala.collection.mutable.Map[Symbol,Function0[Expr]] =
-    scala.collection.mutable.Map.empty[Symbol,Function0[Expr]]
+  private val mutableVarSubsts: scala.collection.mutable.Map[Symbol,Function0[LeonExpr]] =
+    scala.collection.mutable.Map.empty[Symbol,Function0[LeonExpr]]
+  private val varSubsts: scala.collection.mutable.Map[Symbol,Function0[LeonExpr]] =
+    scala.collection.mutable.Map.empty[Symbol,Function0[LeonExpr]]
   private val classesToClasses: scala.collection.mutable.Map[Symbol,ClassTypeDef] =
     scala.collection.mutable.Map.empty[Symbol,ClassTypeDef]
   private val defsToDefs: scala.collection.mutable.Map[Symbol,FunDef] =
@@ -84,11 +75,11 @@ trait CodeExtraction extends Extractors {
 
   //This is a bit missleading, if an expr is not mapped then it has no owner, if it is mapped to None it means
   //that it can have any owner
-  private var owners: Map[Expr, Option[FunDef]] = Map() 
+  private var owners: Map[LeonExpr, Option[FunDef]] = Map() 
 
 
   class Extraction(unit: CompilationUnit) {
-    def toPureScala(tree: Tree): Option[Expr] = {
+    def toPureScala(tree: Tree): Option[LeonExpr] = {
       try {
         Some(extractTree(tree))
       } catch {
@@ -407,7 +398,7 @@ trait CodeExtraction extends Extractors {
       }
     }
 
-    private def extractTree(tr: Tree): Expr = {
+    private def extractTree(tr: Tree): LeonExpr = {
       val (current, tmpRest) = tr match {
         case Block(Block(e :: es1, l1) :: es2, l2) =>
           (e, Some(Block(es1 ++ Seq(l1) ++ es2, l2)))
@@ -572,7 +563,7 @@ trait CodeExtraction extends Extractors {
 
         case epsi @ ExEpsilonExpression(tpe, varSym, predBody) =>
           val pstpe = extractType(tpe)
-          val previousVarSubst: Option[Function0[Expr]] = varSubsts.get(varSym) //save the previous in case of nested epsilon
+          val previousVarSubst: Option[Function0[LeonExpr]] = varSubsts.get(varSym) //save the previous in case of nested epsilon
           varSubsts(varSym) = (() => EpsilonVariable((epsi.pos.line, epsi.pos.column)).setType(pstpe))
           val c1 = extractTree(predBody)
           previousVarSubst match {
@@ -724,7 +715,7 @@ trait CodeExtraction extends Extractors {
           val toUnderlying   = extractType(tt.tpe)
           val tpe = MapType(fromUnderlying, toUnderlying)
 
-          val singletons: Seq[(Expr, Expr)] = elems.collect {
+          val singletons: Seq[(LeonExpr, LeonExpr)] = elems.collect {
             case ExTuple(tpes, trees) if (trees.size == 2) =>
               (extractTree(trees(0)), extractTree(trees(1)))
           }
@@ -1022,11 +1013,11 @@ trait CodeExtraction extends Extractors {
         unsupported("Could not extract type as PureScala: ["+tpt+"]")
     }
 
-    private def getReturnedExpr(expr: Expr): Seq[Expr] = expr match {
+    private def getReturnedExpr(expr: LeonExpr): Seq[LeonExpr] = expr match {
       case Let(_, _, rest) => getReturnedExpr(rest)
       case LetVar(_, _, rest) => getReturnedExpr(rest)
       case LeonBlock(_, rest) => getReturnedExpr(rest)
-      case IfExpr(_, then, elze) => getReturnedExpr(then) ++ getReturnedExpr(elze)
+      case IfExpr(_, thenn, elze) => getReturnedExpr(thenn) ++ getReturnedExpr(elze)
       case MatchExpr(_, cses) => cses.flatMap{
         case SimpleCase(_, rhs) => getReturnedExpr(rhs)
         case GuardedCase(_, _, rhs) => getReturnedExpr(rhs)
@@ -1034,7 +1025,7 @@ trait CodeExtraction extends Extractors {
       case _ => Seq(expr)
     }
 
-    def getOwner(exprs: Seq[Expr]): Option[Option[FunDef]] = {
+    def getOwner(exprs: Seq[LeonExpr]): Option[Option[FunDef]] = {
       val exprOwners: Seq[Option[Option[FunDef]]] = exprs.map(owners.get(_))
       if(exprOwners.exists(_ == None))
         None
@@ -1046,7 +1037,7 @@ trait CodeExtraction extends Extractors {
         exprOwners(0)
     }
 
-    def getOwner(expr: Expr): Option[Option[FunDef]] = getOwner(getReturnedExpr(expr))
+    def getOwner(expr: LeonExpr): Option[Option[FunDef]] = getOwner(getReturnedExpr(expr))
 
       def extractProgram: Option[Program] = {
         val topLevelObjDef = extractTopLevelDef

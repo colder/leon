@@ -6,7 +6,6 @@ package plugin
 import scala.tools.nsc.Settings
 import scala.tools.nsc.reporters.AbstractReporter
 import scala.tools.nsc.util._
-import scala.tools.util.StringOps
 
 /** This implements a reporter that calls the callback with every line that a
 regular ConsoleReporter would display. */

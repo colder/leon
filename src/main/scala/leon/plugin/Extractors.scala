@@ -12,15 +12,21 @@ trait Extractors {
   import global._
   import global.definitions._
 
-  protected lazy val tuple2Sym: Symbol = definitions.getClass("scala.Tuple2")
-  protected lazy val tuple3Sym: Symbol = definitions.getClass("scala.Tuple3")
-  protected lazy val tuple4Sym: Symbol = definitions.getClass("scala.Tuple4")
-  protected lazy val tuple5Sym: Symbol = definitions.getClass("scala.Tuple5")
-  private lazy val setTraitSym      = definitions.getClass("scala.collection.immutable.Set")
-  private lazy val mapTraitSym      = definitions.getClass("scala.collection.immutable.Map")
-  private lazy val multisetTraitSym = definitions.getClass("scala.collection.immutable.Multiset")
-  private lazy val optionClassSym   = definitions.getClass("scala.Option")
-  private lazy val arraySym         = definitions.getClass("scala.Array")
+  def classFromName(str: String) = {
+    definitions.getClass(newTypeName(str))
+  }
+
+  protected lazy val tuple2Sym: Symbol = classFromName("scala.Tuple2")
+  protected lazy val tuple3Sym: Symbol = classFromName("scala.Tuple3")
+  protected lazy val tuple4Sym: Symbol = classFromName("scala.Tuple4")
+  protected lazy val tuple5Sym: Symbol = classFromName("scala.Tuple5")
+  protected lazy val setTraitSym       = classFromName("scala.collection.immutable.Set")
+  protected lazy val mapTraitSym       = classFromName("scala.collection.immutable.Map")
+  protected lazy val multisetTraitSym  = classFromName("scala.collection.immutable.Multiset")
+  protected lazy val optionClassSym    = classFromName("scala.Option")
+  protected lazy val arraySym          = classFromName("scala.Array")
+  protected lazy val someClassSym      = classFromName("scala.Some")
+  protected lazy val function1TraitSym = classFromName("scala.Function1")
 
   def isArrayClassSym(sym: Symbol): Boolean = sym == arraySym
 
@@ -317,10 +323,11 @@ trait Extractors {
             try {
               val index = indexString.toInt
               if(index > 0) {
-                Some((lhs, index)) 
+                Some((lhs, index))
               } else None
             } catch {
-              case _ => None
+              case t: Throwable =>
+                None
             }
           } else None
         }

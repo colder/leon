@@ -233,7 +233,7 @@ case object CEGIS extends Rule("CEGIS") {
               Error("No valid clause available").setType(c.getType)
             } else {
               cases.tail.foldLeft(cases.head._2) {
-                case (elze, (b, then)) => IfExpr(Variable(b), then, elze)
+                case (elze, (b, thenn)) => IfExpr(Variable(b), thenn, elze)
               }
             }
 
