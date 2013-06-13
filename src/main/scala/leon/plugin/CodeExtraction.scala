@@ -251,8 +251,7 @@ trait CodeExtraction extends Extractors {
         case ExMainFunctionDef() =>
         case ExFunctionDef(_,_,_,_) =>
         case tree =>
-          reporter.error(tree.pos, "Don't know what to do with this. Not purescala?");
-          println(tree)
+          unsupported(tree, "Don't know what to do with this. Not purescala?");
       }
 
       new ObjectDef(FreshIdentifier(nameStr), classDefs ::: funDefs, Nil)

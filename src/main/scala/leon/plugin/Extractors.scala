@@ -70,12 +70,10 @@ trait Extractors {
 
     object ExHoldsExpression {
       def unapply(tree: Select) : Option[Tree] = tree match {
-        case Select(Apply(Select(Select(leonIdent, utilsName), any2IsValidName), realExpr :: Nil), holdsName) if (
-          utilsName.toString == "Utils" &&
-          any2IsValidName.toString == "any2IsValid" &&
-          holdsName.toString == "holds") => Some(realExpr)
+        case Select(Apply(ExSelected("leon", "Utils", "any2IsValid"), realExpr :: Nil), ExNamed("holds")) =>
+            Some(realExpr)
         case _ => None
-      }        
+       }
     }
 
     object ExRequiredExpression {

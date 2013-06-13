@@ -320,8 +320,6 @@ class EvaluatorsTests extends FunSuite {
                |  def diff(s1 : Set[Int], s2 : Set[Int]) : Set[Int] = s1 -- s2
                |}""".stripMargin
 
-    println(p)
-
     implicit val prog = parseString(p)
     val evaluators = prepareEvaluators
 
