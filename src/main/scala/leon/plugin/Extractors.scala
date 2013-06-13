@@ -22,11 +22,17 @@ trait Extractors {
   protected lazy val tuple5Sym: Symbol = classFromName("scala.Tuple5")
   protected lazy val setTraitSym       = classFromName("scala.collection.immutable.Set")
   protected lazy val mapTraitSym       = classFromName("scala.collection.immutable.Map")
-  protected lazy val multisetTraitSym  = classFromName("scala.collection.immutable.Multiset")
   protected lazy val optionClassSym    = classFromName("scala.Option")
   protected lazy val arraySym          = classFromName("scala.Array")
   protected lazy val someClassSym      = classFromName("scala.Some")
   protected lazy val function1TraitSym = classFromName("scala.Function1")
+
+  protected lazy val multisetTraitSym  = try {
+      classFromName("scala.collection.immutable.Multiset")
+    } catch {
+      case e: Throwable =>
+        null
+    }
 
   def isArrayClassSym(sym: Symbol): Boolean = sym == arraySym
 
