@@ -13,7 +13,7 @@ trait Extractors {
   import global.definitions._
 
   def classFromName(str: String) = {
-    definitions.getClass(newTypeName(str))
+    rootMirror.getClassByName(newTypeName(str))
   }
 
   protected lazy val tuple2Sym: Symbol = classFromName("scala.Tuple2")

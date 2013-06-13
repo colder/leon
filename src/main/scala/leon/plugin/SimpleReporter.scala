@@ -5,7 +5,8 @@ package plugin
 
 import scala.tools.nsc.Settings
 import scala.tools.nsc.reporters.AbstractReporter
-import scala.tools.nsc.util._
+
+import scala.reflect.internal.util.{Position, NoPosition, FakePos, StringOps}
 
 /** This implements a reporter that calls the callback with every line that a
 regular ConsoleReporter would display. */
@@ -27,7 +28,7 @@ class SimpleReporter(val settings: Settings, reporter: leon.Reporter) extends Ab
     StringOps.countElementsAsString((severity).count, label(severity))
 
   /** Prints the message. */
-  def printMessage(msg: String, severity: Severity) { 
+  def printMessage(msg: String, severity: Severity) {
     severity match {
       case ERROR =>
         reporter.error(msg)
