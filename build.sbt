@@ -14,10 +14,6 @@ scalacOptions += "-feature"
 
 javacOptions += "-Xlint:unchecked"
 
-libraryDependencies += "org.scala-lang" % "scala-compiler" % "2.10.2"
-
-libraryDependencies += "org.scalatest" %% "scalatest" % "1.9.1" % "test"
-
 if(System.getProperty("sun.arch.data.model") == "64") {
   unmanagedBase <<= baseDirectory { base => base / "unmanaged" / "64" }
 } else {
@@ -26,7 +22,11 @@ if(System.getProperty("sun.arch.data.model") == "64") {
 
 resolvers += "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/"
 
-libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.1.4"
+libraryDependencies ++= Seq(
+    "org.scala-lang" % "scala-compiler" % "2.10.2",
+    "org.scalatest" %% "scalatest" % "1.9.1" % "test" excludeAll(ExclusionRule(organization="org.scala-lang")),
+    "com.typesafe.akka" %% "akka-actor" % "2.1.4"
+)
 
 fork in run := true
 
