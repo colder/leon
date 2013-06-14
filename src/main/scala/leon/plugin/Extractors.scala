@@ -15,29 +15,42 @@ trait Extractors {
   def classFromName(str: String) = {
     rootMirror.getClassByName(newTypeName(str))
   }
+  def objectFromName(str: String) = {
+    rootMirror.getClassByName(newTermName(str))
+  }
 
-  protected lazy val tuple2Sym: Symbol = classFromName("scala.Tuple2")
-  protected lazy val tuple3Sym: Symbol = classFromName("scala.Tuple3")
-  protected lazy val tuple4Sym: Symbol = classFromName("scala.Tuple4")
-  protected lazy val tuple5Sym: Symbol = classFromName("scala.Tuple5")
-  protected lazy val setTraitSym       = classFromName("scala.collection.immutable.Set")
-  protected lazy val mapTraitSym       = classFromName("scala.collection.immutable.Map")
-  protected lazy val optionClassSym    = classFromName("scala.Option")
-  protected lazy val arraySym          = classFromName("scala.Array")
-  protected lazy val someClassSym      = classFromName("scala.Some")
-  protected lazy val function1TraitSym = classFromName("scala.Function1")
+  protected lazy val tuple2Sym          = classFromName("scala.Tuple2")
+  protected lazy val tuple3Sym          = classFromName("scala.Tuple3")
+  protected lazy val tuple4Sym          = classFromName("scala.Tuple4")
+  protected lazy val tuple5Sym          = classFromName("scala.Tuple5")
+  protected lazy val mapSym             = classFromName("scala.collection.immutable.Map")
+  protected lazy val setSym             = classFromName("scala.collection.immutable.Set")
+  protected lazy val optionClassSym     = classFromName("scala.Option")
+  protected lazy val arraySym           = classFromName("scala.Array")
+  protected lazy val someClassSym       = classFromName("scala.Some")
+  protected lazy val function1TraitSym  = classFromName("scala.Function1")
 
   def isTuple2(sym : Symbol) : Boolean = sym == tuple2Sym
   def isTuple3(sym : Symbol) : Boolean = sym == tuple3Sym
   def isTuple4(sym : Symbol) : Boolean = sym == tuple4Sym
   def isTuple5(sym : Symbol) : Boolean = sym == tuple5Sym
 
+
+  // Resolve type aliases
+  def getResolvedTypeSym(sym: Symbol): Symbol = {
+    if (sym.isAliasType) {
+      getResolvedTypeSym(sym.tpe.resultType.typeSymbol)
+    } else {
+      sym
+    }
+  }
+
   def isSetTraitSym(sym : Symbol) : Boolean = {
-    sym == setTraitSym || sym.tpe.toString.startsWith("scala.Predef.Set")
+    getResolvedTypeSym(sym) == setSym
   }
 
   def isMapTraitSym(sym : Symbol) : Boolean = {
-    sym == mapTraitSym || sym.tpe.toString.startsWith("scala.Predef.Map")
+    getResolvedTypeSym(sym) == mapSym
   }
 
   def isMultisetTraitSym(sym : Symbol) : Boolean = {
@@ -668,18 +681,18 @@ trait Extractors {
 
     object ExUnion {
       def unapply(tree: Apply): Option[(Tree,Tree)] = tree match {
-        case Apply(Select(lhs, n), List(rhs)) if (n == encode("++")/*nme.PLUSPLUS*/) => Some((lhs,rhs))
+        case Apply(Select(lhs, n), List(rhs)) if n == encode("++") => Some((lhs,rhs))
         case _ => None
       }
     }
 
     object ExPlusPlusPlus {
       def unapply(tree: Apply): Option[(Tree,Tree)] = tree match {
-        case Apply(Select(lhs, n), List(rhs)) if (n.toString == "$plus$plus$plus") => Some((lhs,rhs))
+        case Apply(Select(lhs, n), List(rhs)) if n.toString == encode("+++") => Some((lhs,rhs))
         case _ => None
       }
     }
-  
+
     object ExIntersection {
       def unapply(tree: Apply): Option[(Tree,Tree)] = tree match {
         case Apply(Select(lhs, n), List(rhs)) if (n == encode("**") || n == encode("&")) => Some((lhs,rhs))

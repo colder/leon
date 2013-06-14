@@ -981,11 +981,14 @@ trait CodeExtraction extends Extractors {
       case TypeRef(_, sym, btt :: Nil) if isArrayClassSym(sym) =>
         ArrayType(extractType(btt))
 
-      case TypeRef(_, sym, Nil) if classesToClasses.keySet.contains(sym) =>
+      case TypeRef(_, sym, Nil) if classesToClasses contains sym =>
         classDefToClassType(classesToClasses(sym))
 
+      case SingleType(_, sym) if classesToClasses contains sym.moduleClass=>
+        classDefToClassType(classesToClasses(sym.moduleClass))
+
       case _ =>
-        unsupported("Could not extract type as PureScala: ["+tpt+"]")
+        unsupported("Could not extract type as PureScala: "+tpt+" ("+tpt.getClass+")")
     }
 
     private def getReturnedExpr(expr: LeonExpr): Seq[LeonExpr] = expr match {
