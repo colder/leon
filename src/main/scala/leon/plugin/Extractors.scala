@@ -27,6 +27,32 @@ trait Extractors {
   protected lazy val someClassSym      = classFromName("scala.Some")
   protected lazy val function1TraitSym = classFromName("scala.Function1")
 
+  def isTuple2(sym : Symbol) : Boolean = sym == tuple2Sym
+  def isTuple3(sym : Symbol) : Boolean = sym == tuple3Sym
+  def isTuple4(sym : Symbol) : Boolean = sym == tuple4Sym
+  def isTuple5(sym : Symbol) : Boolean = sym == tuple5Sym
+
+  def isSetTraitSym(sym : Symbol) : Boolean = {
+    sym == setTraitSym || sym.tpe.toString.startsWith("scala.Predef.Set")
+  }
+
+  def isMapTraitSym(sym : Symbol) : Boolean = {
+    sym == mapTraitSym || sym.tpe.toString.startsWith("scala.Predef.Map")
+  }
+
+  def isMultisetTraitSym(sym : Symbol) : Boolean = {
+    sym == multisetTraitSym
+  }
+
+  def isOptionClassSym(sym : Symbol) : Boolean = {
+    sym == optionClassSym || sym == someClassSym
+  }
+
+  def isFunction1TraitSym(sym : Symbol) : Boolean = {
+    sym == function1TraitSym
+  }
+
+
   protected lazy val multisetTraitSym  = try {
       classFromName("scala.collection.immutable.Multiset")
     } catch {
@@ -154,7 +180,7 @@ trait Extractors {
 
     object ExCaseClassSyntheticJunk {
       def unapply(cd: ClassDef): Boolean = cd match {
-        case ClassDef(_, _, _, _) if (cd.symbol.isSynthetic && cd.symbol.isFinal) => true
+        case ClassDef(_, _, _, _) if (cd.symbol.isSynthetic) => true
         case _ => false
       }
     }

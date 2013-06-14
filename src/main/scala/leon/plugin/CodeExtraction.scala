@@ -25,31 +25,6 @@ trait CodeExtraction extends Extractors {
   import ExpressionExtractors._
   import ExtractorHelpers._
 
-  def isTuple2(sym : Symbol) : Boolean = sym == tuple2Sym
-  def isTuple3(sym : Symbol) : Boolean = sym == tuple3Sym
-  def isTuple4(sym : Symbol) : Boolean = sym == tuple4Sym
-  def isTuple5(sym : Symbol) : Boolean = sym == tuple5Sym
-
-  def isSetTraitSym(sym : Symbol) : Boolean = {
-    sym == setTraitSym || sym.tpe.toString.startsWith("scala.Predef.Set")
-  }
-
-  def isMapTraitSym(sym : Symbol) : Boolean = {
-    sym == mapTraitSym || sym.tpe.toString.startsWith("scala.Predef.Map")
-  }
-
-  def isMultisetTraitSym(sym : Symbol) : Boolean = {
-    sym == multisetTraitSym
-  }
-
-  def isOptionClassSym(sym : Symbol) : Boolean = {
-    sym == optionClassSym || sym == someClassSym
-  }
-
-  def isFunction1TraitSym(sym : Symbol) : Boolean = {
-    sym == function1TraitSym
-  }
-
   class ScalaPos(p: global.Position) extends ScalacPositional {
     setPosInfo(p.line, p.column)
   }
