@@ -18,25 +18,31 @@ import org.scalatest.FunSuite
 
 class FairZ3SolverTests extends FunSuite {
   private var testCounter : Int = 0
-  private def solverCheck(solver : Solver, expr : Expr, expected : Option[Boolean], msg : String) = {
+  private def solverCheck(solver : FairZ3Solver, expr : Expr, expected : Option[Boolean], msg : String) = {
     testCounter += 1
 
     test("Solver test #" + testCounter) {
-      assert(solver.solve(expr) === expected, msg)
+      val s = solver.getNewSolver
+      s.assertCnstr(Not(expr))
+      val res = s.check.map(!_)
+      if (res == Some(true)) {
+        println("Model: "+s.getModel)
+      }
+      assert(res === expected, msg)
     }
   }
 
-  private def assertValid(solver : Solver, expr : Expr) = solverCheck(
+  private def assertValid(solver : FairZ3Solver, expr : Expr) = solverCheck(
     solver, expr, Some(true),
     "Solver should prove the formula " + expr + " valid."
   )
 
-  private def assertInvalid(solver : Solver, expr : Expr) = solverCheck(
+  private def assertInvalid(solver : FairZ3Solver, expr : Expr) = solverCheck(
     solver, expr, Some(false),
     "Solver should prove the formula " + expr + " invalid."
   )
 
-  private def assertUnknown(solver : Solver, expr : Expr) = solverCheck(
+  private def assertUnknown(solver : FairZ3Solver, expr : Expr) = solverCheck(
     solver, expr, None,
     "Solver should not be able to decide the formula " + expr + "."
   )
@@ -85,6 +91,19 @@ class FairZ3SolverTests extends FunSuite {
   // This is true, and FairZ3Solver should know it (by inlining).
   private val unknown1 : Expr = Equals(f(x), Plus(x, IntLiteral(1)))
   assertValid(solver, unknown1)
+
+  test("Check proofs") {
+    val b1 = Variable(FreshIdentifier("b").setType(BooleanType))
+
+    val f = And(b1, Not(b1))
+
+    val s = solver.getNewSolver
+
+    s.assertCnstr(f)
+
+    println(s.check);
+    println(s.getProof);
+  }
 
   test("Check assumptions") {
     val b1 = Variable(FreshIdentifier("b").setType(BooleanType))

@@ -26,6 +26,7 @@ trait IncrementalSolver extends InterruptibleSolver {
   def check: Option[Boolean]
   def checkAssumptions(assumptions: Set[Expr]): Option[Boolean]
   def getModel: Map[Identifier, Expr]
+  def getProof: Option[Expr] = None
   def getUnsatCore: Set[Expr]
 }
 
@@ -74,6 +75,7 @@ trait NaiveIncrementalSolver extends IncrementalSolverBuilder {
     def getModel: Map[Identifier, Expr] = {
       Map[Identifier, Expr]()
     }
+
 
     def getUnsatCore: Set[Expr] = {
       unsatCore

@@ -26,7 +26,12 @@ class FairZ3SolverTestsNewAPI extends FunSuite {
 
       sub.assertCnstr(Not(expr))
 
-      assert(sub.check === expected.map(!_), msg)
+      val res = sub.check
+
+      if (res == Some(true)) {
+        println("MODEL: "+sub.getModel)
+      }
+      assert(res === expected.map(!_), msg)
     }
   }
 

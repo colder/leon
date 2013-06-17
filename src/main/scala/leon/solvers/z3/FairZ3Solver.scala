@@ -84,6 +84,7 @@ class FairZ3Solver(context : LeonContext)
   protected[leon] val z3cfg = new Z3Config(
     "MODEL" -> true,
     "MBQI" -> false,
+    "PROOF_MODE" -> 1,
     "TYPE_CHECK" -> true,
     "WELL_SORTED_CHECK" -> true
   )
@@ -416,6 +417,14 @@ class FairZ3Solver(context : LeonContext)
 
     def check: Option[Boolean] = {
       fairCheck(Set())
+    }
+
+    override def getProof = {
+
+      println(solver.getProof)
+
+      None
+                 
     }
 
     def checkAssumptions(assumptions: Set[Expr]): Option[Boolean] = {
