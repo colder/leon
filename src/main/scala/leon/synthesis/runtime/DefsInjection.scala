@@ -39,6 +39,7 @@ object DefsInjectionPhase extends LeonPhase[Program, Unit] {
 
     val newP = p.copy(mainObject = p.mainObject.copy(defs = runtimeVal +: p.mainObject.defs))
 
+    println("import leon.Utils._")
     println(ScalaPrinter(newP))
   }
 
