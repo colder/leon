@@ -28,6 +28,7 @@ object Main {
   lazy val topLevelOptions : Set[LeonOptionDef] = Set(
       LeonFlagOptionDef ("termination",  "--termination", "Check program termination"),
       LeonFlagOptionDef ("synthesis",    "--synthesis",   "Partial synthesis of choose() constructs"),
+      LeonFlagOptionDef ("runtime",      "--runtime",     "Prepare for runtime synthesis"),
       LeonFlagOptionDef ("xlang",        "--xlang",       "Support for extra program constructs (imperative,...)"),
       LeonFlagOptionDef ("parse",        "--parse",       "Checks only whether the program is valid PureScala"),
       LeonValueOptionDef("debug",        "--debug=[1-5]", "Debug level"),
@@ -107,6 +108,8 @@ object Main {
     for(opt <- leonOptions) opt match {
       case LeonFlagOption("termination") =>
         settings = settings.copy(termination = true, xlang = false, verify = false, synthesis = false)
+      case LeonFlagOption("runtime") =>
+        settings = settings.copy(runtime = true, verify = false)
       case LeonFlagOption("synthesis") =>
         settings = settings.copy(synthesis = true, xlang = false, verify = false)
       case LeonFlagOption("xlang") =>
@@ -133,8 +136,10 @@ object Main {
         NoopPhase()
       }
 
-    val pipeVerify: Pipeline[Program, Any] =
-      if (settings.termination) {
+    val pipeAnalysis: Pipeline[Program, Any] =
+      if (settings.runtime) {
+        synthesis.runtime.DefsInjectionPhase
+      } else if (settings.termination) {
         // OK, OK, that's not really verification...
         termination.TerminationPhase
       } else if (settings.xlang) {
@@ -147,7 +152,7 @@ object Main {
 
     pipeBegin andThen
     pipeSynthesis andThen
-    pipeVerify
+    pipeAnalysis
   }
 
   def main(args : Array[String]) {
