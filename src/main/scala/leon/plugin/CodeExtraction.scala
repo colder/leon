@@ -173,7 +173,7 @@ trait CodeExtraction extends Extractors {
 
       // First pass to instanciate all FunDefs
       for (d <- tmpl.body) d match {
-        case ExMainFunctionDef() =>
+        //case ExMainFunctionDef() =>
           // we ignore the main function
 
         case dd @ ExFunctionDef(name, params, tpe, body) =>
@@ -947,6 +947,9 @@ trait CodeExtraction extends Extractors {
     private def extractType(tpt: Type): LeonType = tpt match {
       case tpe if tpe == IntClass.tpe =>
         Int32Type
+
+      case tpe if tpe == StringClass.tpe =>
+        StringType
 
       case tpe if tpe == BooleanClass.tpe =>
         BooleanType

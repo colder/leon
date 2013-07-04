@@ -1,0 +1,30 @@
+#!/bin/bash
+
+rm -rf runtime
+mkdir -p runtime/sources
+mkdir -p runtime/classes
+
+mainfile=${1##*/}
+mainclass=${mainfile%.scala}
+
+targetsource=runtime/sources/$mainfile
+
+echo "Running Leon on $1"
+./leon $@ --runtime > $targetsource
+
+if [ "$?" -ne 0 ]; then
+    echo "Failed to leonize";
+    cat $targetsource
+    exit 1
+fi
+
+echo "Produced $targetsource:"
+cat $targetsource
+
+
+
+echo "Compiling $targetsource with scalac..."
+scalac -cp target/scala-2.10/classes/:library/target/scala-2.10/classes/ -d runtime/classes $targetsource
+
+echo "Running $mainclass..."
+scala -cp target/scala-2.10/classes/:library/target/scala-2.10/classes/:runtime/classes $mainclass
