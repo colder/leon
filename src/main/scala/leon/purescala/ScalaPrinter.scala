@@ -505,13 +505,16 @@ object ScalaPrinter {
           }
         }
 
+        sb
+      }
+
       case _ => sb.append("Defn?")
     }
   }
 
   trait ScalaPrintable {
-    def ppScala(sb: StringBuffer, lvl: Int, 
-      ep: (Expr, StringBuffer, Int) => Unit, 
+    def ppScala(sb: StringBuffer, lvl: Int,
+      ep: (Expr, StringBuffer, Int) => Unit,
       tp: (TypeTree, StringBuffer, Int) => Unit,
       dp: (Definition, StringBuffer, Int) => Unit
     ): StringBuffer

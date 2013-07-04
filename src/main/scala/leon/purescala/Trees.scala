@@ -397,7 +397,10 @@ object Trees {
     val fixedType = BooleanType
   }
 
-  case class StringLiteral(value: String) extends Literal[String]
+  case class StringLiteral(value: String) extends Literal[String] with FixedType {
+    val fixedType = StringType
+  }
+
   case object UnitLiteral extends Literal[Unit] with FixedType {
     val fixedType = UnitType
     val value = ()
