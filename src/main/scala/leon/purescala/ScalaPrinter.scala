@@ -505,8 +505,10 @@ object ScalaPrinter {
           }
         }
 
-        sb
-      }
+      case ValDef(VarDecl(id, tpe), value) =>
+        ind(sb, lvl)
+        sb.append("val " + id.name + " = ")
+        pp(value, sb, lvl+1)
 
       case _ => sb.append("Defn?")
     }
