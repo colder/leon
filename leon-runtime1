@@ -1,0 +1,33 @@
+#!/bin/bash
+
+#rm -rf runtime
+#mkdir -p runtime/sources
+#mkdir -p runtime/classes
+
+mainfile=${1##*/}
+mainclass=${mainfile%.scala}
+
+targetsource=runtime/sources/$mainfile
+
+#echo "Running Leon on $1"
+#./leon $@ --runtime > $targetsource
+#
+#if [ "$?" -ne 0 ]; then
+#    echo "Failed to leonize";
+#    cat $targetsource
+#    exit 1
+#fi
+#
+#echo "Produced $targetsource:"
+#cat $targetsource
+#
+
+SCALACLASSPATH="/home/ekneuss/git/leon/target/scala-2.10/classes:/home/ekneuss/git/leon/library/target/scala-2.10/classes:/home/ekneuss/git/leon/unmanaged/64/cafebabe_2.10-1.2.jar:/home/ekneuss/git/leon/unmanaged/64/scalaz3_2.10-2.0.jar:/home/ekneuss/.sbt/0.12.1/boot/scala-2.10.2/lib/scala-library.jar:/home/ekneuss/.sbt/0.12.1/boot/scala-2.10.2/lib/scala-compiler.jar:/home/ekneuss/.ivy2/cache/org.scala-lang/scala-reflect/jars/scala-reflect-2.10.2.jar:/home/ekneuss/.ivy2/cache/com.typesafe.akka/akka-actor_2.10/bundles/akka-actor_2.10-2.1.4.jar:/home/ekneuss/.ivy2/cache/com.typesafe/config/bundles/config-1.0.0.jar"
+
+
+echo "Compiling $targetsource with scalac..."
+scalac210 -cp target/scala-2.10/classes/:library/target/scala-2.10/classes/ -d runtime/classes $targetsource
+
+source ./setupenv
+echo "Running $mainclass..."
+scala210 -cp $SCALACLASSPATH:runtime/classes $mainclass
