@@ -27,7 +27,7 @@ object RuntimeSynthesis {
 
     ctx         = LeonContext()
     options     = SynthesisOptions()
-    val fair    = new FairZ3Solver(ctx)
+    val fair    = new FairZ3Solver(ctx.copy(reporter = new SilentReporter()))
     fair.setProgram(program)
     solver      = new TimeoutSolver(fair, 10000L) // We give that 10s
   }
@@ -107,6 +107,7 @@ object RuntimeSynthesis {
   }
 
   def onChoose(fileName: String, line: Int, inputs: Map[String, Any]): Any = {
+    val tStart = System.currentTimeMillis
     if (!initialized) {
       init(fileName);
     }
@@ -139,6 +140,9 @@ object RuntimeSynthesis {
             } else {
               res(0)
             }
+
+            val total = System.currentTimeMillis-tStart;
+            ctx.reporter.info("Synthesis took "+total+"ms")
 
             ctx.reporter.info("Finished synthesis with "+leonRes)
 
