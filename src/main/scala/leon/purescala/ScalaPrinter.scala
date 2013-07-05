@@ -132,6 +132,13 @@ object ScalaPrinter {
         ppNary(sb, args, "(", ", ", ")", lvl)
       }
     }
+
+    case AsInstanceOf(e, t) =>
+      pp(e, sb, lvl)
+      sb.append(".asInstanceOf[")
+      pp(t, sb, lvl)
+      sb.append("]")
+
     case CaseClassInstanceOf(cd, e) => {
       pp(e, sb, lvl)
       sb.append(".isInstanceOf[" + cd.id + "]")
@@ -177,13 +184,13 @@ object ScalaPrinter {
    // case MultisetPlus(l,r) => ppBinary(sb, l, r, " \u228E ", lvl)    // U+
    // case MultisetToSet(e) => pp(e, sb, lvl).append(".toSet")
     case FiniteMap(rs) => {
-      sb.append("{")
+      sb.append("Map(")
       val sz = rs.size
       var c = 0
       rs.foreach{case (k, v) => {
         pp(k, sb, lvl); sb.append(" -> "); pp(v, sb, lvl); c += 1 ; if(c < sz) sb.append(", ")
       }}
-      sb.append("}")
+      sb.append(")")
     }
     case MapGet(m,k) => {
       pp(m, sb, lvl)
@@ -272,16 +279,19 @@ object ScalaPrinter {
         //case InstanceOfPattern(Some(id), ctd) =>
         case CaseClassPattern(bndr,     ccd, subps) => {
           bndr.foreach(b => sb.append(b + " @ "))
-          sb.append(ccd.id).append("(")
-          var c = 0
-          val sz = subps.size
-          subps.foreach(sp => {
-            ppc(sb, sp)
-            if(c < sz - 1)
-              sb.append(", ")
-            c = c + 1
-          })
-          sb.append(")")
+          sb.append(ccd.id)
+          if (!ccd.isCaseObject) {
+            sb.append("(")
+            var c = 0
+            val sz = subps.size
+            subps.foreach(sp => {
+              ppc(sb, sp)
+              if(c < sz - 1)
+                sb.append(", ")
+              c = c + 1
+            })
+            sb.append(")")
+          }
         }
         case WildcardPattern(None)     => sb.append("_")
         case WildcardPattern(Some(id)) => sb.append(id)
@@ -357,8 +367,10 @@ object ScalaPrinter {
 
   private def pp(tpe: TypeTree, sb: StringBuffer, lvl: Int): Unit = tpe match {
     case Untyped => sb.append("???")
+    case AnyType => sb.append("Any")
     case UnitType => sb.append("Unit")
     case Int32Type => sb.append("Int")
+    case StringType => sb.append("String")
     case BooleanType => sb.append("Boolean")
     case ArrayType(bt) =>
       sb.append("Array[")
@@ -421,24 +433,29 @@ object ScalaPrinter {
         sb.append(id)
         parent.foreach(p => sb.append(" extends " + p.id))
 
-      case CaseClassDef(id, parent, varDecls) =>
+      case cd @ CaseClassDef(id, parent, varDecls) =>
         ind(sb, lvl)
-        sb.append("case class ")
-        sb.append(id)
-        sb.append("(")
-        var c = 0
-        val sz = varDecls.size
+        if (cd.isCaseObject) {
+          sb.append("case object ")
+          sb.append(id)
+        } else {
+          sb.append("case class ")
+          sb.append(id)
+          sb.append("(")
+          var c = 0
+          val sz = varDecls.size
 
-        varDecls.foreach(vd => {
-          sb.append(vd.id)
-          sb.append(": ")
-          pp(vd.tpe, sb, lvl)
-          if(c < sz - 1) {
-            sb.append(", ")
-          }
-          c = c + 1
-        })
-        sb.append(")")
+          varDecls.foreach(vd => {
+            sb.append(vd.id)
+            sb.append(": ")
+            pp(vd.tpe, sb, lvl)
+            if(c < sz - 1) {
+              sb.append(", ")
+            }
+            c = c + 1
+          })
+          sb.append(")")
+        }
         parent.foreach(p => sb.append(" extends " + p.id))
 
       case fd @ FunDef(id, rt, args, body, pre, post) =>

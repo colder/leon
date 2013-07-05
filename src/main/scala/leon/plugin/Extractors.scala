@@ -45,6 +45,10 @@ trait Extractors {
     }
   }
 
+  def isStringSym(sym : Symbol) : Boolean = {
+    getResolvedTypeSym(sym) == StringClass
+  }
+
   def isSetTraitSym(sym : Symbol) : Boolean = {
     getResolvedTypeSym(sym) == setSym
   }

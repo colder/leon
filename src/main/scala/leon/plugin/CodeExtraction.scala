@@ -930,7 +930,6 @@ trait CodeExtraction extends Extractors {
           val rt: LeonType = rc.map(_.rhs.getType).reduceLeft(leastUpperBound(_,_).get)
           MatchExpr(rs, rc).setType(rt).setPosInfo(pm.pos.line,pm.pos.column)
 
-
         // default behaviour is to complain :)
         case _ =>
           unsupported(tr, "Could not extract as PureScala")
@@ -948,9 +947,6 @@ trait CodeExtraction extends Extractors {
       case tpe if tpe == IntClass.tpe =>
         Int32Type
 
-      case tpe if tpe == StringClass.tpe =>
-        StringType
-
       case tpe if tpe == BooleanClass.tpe =>
         BooleanType
 
@@ -959,6 +955,9 @@ trait CodeExtraction extends Extractors {
 
       case tpe if tpe == NothingClass.tpe =>
         BottomType
+
+      case TypeRef(_, sym, Nil) if isStringSym(sym) =>
+        StringType
 
       case TypeRef(_, sym, btt :: Nil) if isSetTraitSym(sym) =>
         SetType(extractType(btt))

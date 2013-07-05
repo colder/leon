@@ -103,6 +103,12 @@ class PrettyPrinter(sb: StringBuffer = new StringBuffer) {
         ppNary(args, "(", ", ", ")", lvl)
       }
 
+    case AsInstanceOf(e, t) =>
+      pp(e, lvl)
+      sb.append(".asInstanceOf[")
+      pp(t, lvl)
+      sb.append("]")
+
     case CaseClassInstanceOf(cd, e) =>
       pp(e, lvl)
       sb.append(".isInstanceOf[" + idToString(cd.id) + "]")
@@ -302,6 +308,7 @@ class PrettyPrinter(sb: StringBuffer = new StringBuffer) {
     case Untyped => sb.append("???")
     case UnitType => sb.append("Unit")
     case Int32Type => sb.append("Int")
+    case StringType => sb.append("String")
     case BooleanType => sb.append("Boolean")
     case ArrayType(bt) => sb.append("Array["); pp(bt, lvl); sb.append("]")
     case SetType(bt) => sb.append("Set["); pp(bt, lvl); sb.append("]")
