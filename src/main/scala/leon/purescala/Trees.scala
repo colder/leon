@@ -406,6 +406,10 @@ object Trees {
     val value = ()
   }
 
+  case class AsInstanceOf(e: Expr, tpe: TypeTree) extends Expr with FixedType {
+    val fixedType = tpe
+  }
+
   case class CaseClass(classDef: CaseClassDef, args: Seq[Expr]) extends Expr with FixedType {
     val fixedType = CaseClassType(classDef)
   }

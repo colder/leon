@@ -42,7 +42,7 @@ object Common {
     def freshen: Identifier = FreshIdentifier(name, alwaysShowUniqueID).setType(getType)
   }
 
-  private object UniqueCounter {
+  private[leon] object UniqueCounter {
     private var globalId = -1
     private var nameIds = Map[String, Int]().withDefaultValue(-1)
 
@@ -54,6 +54,11 @@ object Common {
     def nextGlobal = {
       globalId += 1
       globalId
+    }
+
+    // To be used by runtime to reset the globalid
+    def reset(id: Int) {
+      globalId = id;
     }
   }
 

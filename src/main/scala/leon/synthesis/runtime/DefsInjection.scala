@@ -6,6 +6,7 @@ package runtime
 
 import java.io.{ObjectOutputStream, FileOutputStream, File}
 import purescala.Trees._
+import purescala.TreeOps._
 import purescala.Definitions._
 import purescala.Common._
 import purescala.TypeTrees._
@@ -17,30 +18,49 @@ object DefsInjectionPhase extends LeonPhase[Program, Unit] {
   val description = "Injection of definitions to runtime"
 
   def run(ctx: LeonContext)(p: Program): Unit = {
-    val options = SynthesisPhase.processOptions(ctx)
-
-    var chooses = ChooseInfo.extractFromProgram(ctx, p, options)
-
     // Generate random file with serialized data
     val fName = "leon_"+p.mainObject.id.name+".obj"
 
     val oos = new ObjectOutputStream(new FileOutputStream(new File(fName)))
     oos.writeObject(p)
+    oos.writeObject(UniqueCounter.nextGlobal)
     oos.close
 
     // Generate fake FunDef to mock call to internal runtime init
-    val initFunDef = new FunDef(FreshIdentifier("leon.synthesis.runtime.RuntimeSynthesis.init"),
-                                UnitType,
-                                Seq(VarDecl(FreshIdentifier("name"), StringType)))
 
-    // Initialize the runtime synthesis engine with relevant info:
-    val runtimeVal = ValDef(VarDecl(FreshIdentifier("__runtimeInit"), UnitType),
-                            FunctionInvocation(initFunDef, Seq(StringLiteral(fName))))
+    val onChoose = new FunDef(FreshIdentifier("leon.synthesis.runtime.RuntimeSynthesis.onChoose"),
+                                AnyType,
+                                Seq(
+                                  VarDecl(FreshIdentifier("file"), StringType),
+                                  VarDecl(FreshIdentifier("line"), Int32Type),
+                                  VarDecl(FreshIdentifier("map"), MapType(StringType, AnyType))
+                                ))
 
-    val newP = p.copy(mainObject = p.mainObject.copy(defs = runtimeVal +: p.mainObject.defs))
+
+    def interceptChooses(e: Expr): Option[Expr] = e match {
+      case c @ Choose(vars, phi) =>
+        
+        val inputVars = variablesOf(phi) -- vars.toSet
+
+        val fcall = FunctionInvocation(onChoose, Seq(
+                                              StringLiteral(fName),
+                                              IntLiteral(c.posIntInfo._1),
+                                              FiniteMap(
+                                                inputVars.map(v => StringLiteral(v.name.toString) -> Variable(v)).toSeq
+                                              ).setType(MapType(StringType, AnyType))
+                                          )
+                                      )
+
+        Some(AsInstanceOf(fcall, c.getType))
+      case _ => None
+    }
+
+    p.definedFunctions.foreach { fd =>
+        fd.body = fd.body.map( searchAndReplaceDFS(interceptChooses)_ )
+    }
 
     println("import leon.Utils._")
-    println(ScalaPrinter(newP))
+    println(ScalaPrinter(p))
   }
 
 
