@@ -83,7 +83,7 @@ object ScalaPrinter {
       }
       sb.append(") = ")
       pp(d, sb, lvl+1)
-      sb.append("\n")
+      sb.append(";\n")
       ind(sb, lvl+1)
       pp(e, sb, lvl+1)
       sb.append("\n")
@@ -96,7 +96,7 @@ object ScalaPrinter {
       ind(sb, lvl+1)
       sb.append("val " + b + " = ")
       pp(d, sb, lvl+1)
-      sb.append("\n")
+      sb.append(";\n")
       ind(sb, lvl+1)
       pp(e, sb, lvl+1)
       sb.append("\n")
