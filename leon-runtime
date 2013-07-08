@@ -24,8 +24,8 @@ cat $targetsource
 SCALACLASSPATH="/home/ekneuss/git/leon/target/scala-2.10/classes:/home/ekneuss/git/leon/library/target/scala-2.10/classes:/home/ekneuss/git/leon/unmanaged/64/cafebabe_2.10-1.2.jar:/home/ekneuss/git/leon/unmanaged/64/scalaz3_2.10-2.0.jar:/home/ekneuss/.sbt/0.12.1/boot/scala-2.10.2/lib/scala-library.jar:/home/ekneuss/.sbt/0.12.1/boot/scala-2.10.2/lib/scala-compiler.jar:/home/ekneuss/.ivy2/cache/org.scala-lang/scala-reflect/jars/scala-reflect-2.10.2.jar:/home/ekneuss/.ivy2/cache/com.typesafe.akka/akka-actor_2.10/bundles/akka-actor_2.10-2.1.4.jar:/home/ekneuss/.ivy2/cache/com.typesafe/config/bundles/config-1.0.0.jar"
 
 echo "Compiling $targetsource with scalac..."
-scalac210 -cp $SCALACLASSPATH -d runtime/classes $targetsource
+scalac -cp $SCALACLASSPATH -d runtime/classes $targetsource
 
 source setupenv
 echo "Running $mainclass..."
-scala210 -cp $SCALACLASSPATH:runtime/classes $mainclass
+scala -cp $SCALACLASSPATH:runtime/classes $mainclass

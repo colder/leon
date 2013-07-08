@@ -4,7 +4,8 @@ package runtime
 
 import purescala.Definitions._
 import purescala.Common.UniqueCounter
-import solvers.{Solver, TimeoutSolver}
+import purescala.TreeOps.replace
+import solvers.{Solver, TimeoutSolver, IncrementalSolver}
 import solvers.z3.FairZ3Solver
 import java.io.{File, FileInputStream, ObjectInputStream}
 
@@ -13,7 +14,7 @@ object RuntimeSynthesis {
   private[this] var program: Program          = null
   private[this] var ctx: LeonContext          = null
   private[this] var options: SynthesisOptions = null
-  private[this] var solver: Solver            = null
+  private[this] var mainSolver: Solver        = null
 
   import purescala.Trees._
 
@@ -25,11 +26,19 @@ object RuntimeSynthesis {
 
     UniqueCounter.reset(cnt)
 
-    ctx         = LeonContext()
+
+    val opts    = List(
+//                    LeonFlagOption("codegen"),
+//                    LeonFlagOption("feelinglucky"),
+//                    LeonFlagOption("evalground")
+//                    LeonFlagOption("fairz3:unrollcores")
+                  )
+
+    ctx         = LeonContext(options = opts)
     options     = SynthesisOptions()
     val fair    = new FairZ3Solver(ctx.copy(reporter = new SilentReporter()))
     fair.setProgram(program)
-    solver      = new TimeoutSolver(fair, 10000L) // We give that 10s
+    mainSolver  = new TimeoutSolver(fair, 60000L) // We give that 1min
   }
 
   object ExCaseClass {
@@ -123,16 +132,19 @@ object RuntimeSynthesis {
 
         val inputsMap = inputs.map {
           case (name, v) =>
-            Equals(Variable(as(name)), valToLeonVal(v))
+            (Variable(as(name)): Expr) -> valToLeonVal(v)
         }
 
-        val s = solver.getNewSolver
-        s.assertCnstr(And(Seq(p.pc, p.phi) ++ inputsMap))
-        println(And(Seq(p.pc, p.phi) ++ inputsMap))
 
-        s.check match {
+        val newPhi = replace(inputsMap, p.phi)
+
+        val solver = mainSolver.getNewSolver
+        solver.assertCnstr(newPhi)
+        println(newPhi)
+
+        solver.check match {
           case Some(true) =>
-            val model = s.getModel;
+            val model = solver.getModel;
 
             val res = p.xs.map(model(_))
             val leonRes = if (res.size > 1) {

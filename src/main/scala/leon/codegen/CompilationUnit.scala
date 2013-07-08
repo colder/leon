@@ -67,6 +67,9 @@ class CompilationUnit(val program: Program, val classes: Map[Definition, ClassFi
     case BooleanLiteral(v) =>
       new java.lang.Boolean(v)
 
+    case StringLiteral(v) =>
+      v
+
     case CaseClass(ccd, args) =>
       val cons = caseClassConstructors(ccd)
       cons.newInstance(args.map(valueToJVM).toArray : _*).asInstanceOf[AnyRef]

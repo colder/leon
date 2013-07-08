@@ -20,6 +20,7 @@ object CodeGeneration {
   private val BoxedBoolClass = "java/lang/Boolean"
 
   private val TupleClass     = "leon/codegen/runtime/Tuple"
+  private val StringClass    = "java/lang/String"
   private val SetClass       = "leon/codegen/runtime/Set"
   private val MapClass       = "leon/codegen/runtime/Map"
   private val CaseClassClass = "leon/codegen/runtime/CaseClass"
@@ -33,10 +34,13 @@ object CodeGeneration {
 
     case BooleanType => "Z"
 
-    case UnitType => "Z"
+    case UnitType => "V"
 
     case c : ClassType =>
       env.classDefToClass(c.classDef).map(n => "L" + n + ";").getOrElse("Unsupported class " + c.id)
+
+    case StringType =>
+      "L" + StringClass + ";"
 
     case _ : TupleType =>
       "L" + TupleClass + ";"
@@ -77,7 +81,11 @@ object CodeGeneration {
     mkExpr(exprToCompile, ch)(env.withVars(newMapping))
 
     funDef.returnType match {
-      case Int32Type | BooleanType | UnitType =>
+      case UnitType =>
+        ch << POP
+        ch << RETURN
+
+      case Int32Type | BooleanType =>
         ch << IRETURN
 
       case _ : ClassType | _ : TupleType | _ : SetType | _ : MapType | _ : ArrayType =>
@@ -109,6 +117,13 @@ object CodeGeneration {
         }
         ch << instr
         mkExpr(b, ch)(env.withVars(Map(i -> slot)))
+
+      case xlang.Trees.Block(ss, e) =>
+        for (s <- ss) {
+          mkExpr(s, ch)(env)
+          ch << POP
+        }
+        mkExpr(e, ch)(env)
 
       case LetTuple(is,d,b) =>
         mkExpr(d, ch) // the tuple

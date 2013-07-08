@@ -30,4 +30,4 @@ SCALACLASSPATH="/home/ekneuss/git/leon/target/scala-2.10/classes:/home/ekneuss/g
 
 source ./setupenv
 echo "Running $mainclass..."
-scala210 -cp $SCALACLASSPATH:runtime/classes $mainclass
+scala -cp $SCALACLASSPATH:runtime/classes $mainclass

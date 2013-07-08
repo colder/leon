@@ -24,7 +24,7 @@ resolvers += "Typesafe Repository" at "http://repo.typesafe.com/typesafe/release
 
 libraryDependencies ++= Seq(
     "org.scala-lang" % "scala-compiler" % "2.10.2",
-    "org.scalatest" %% "scalatest" % "1.9.1" % "test" excludeAll(ExclusionRule(organization="org.scala-lang")),
+    "org.scalatest" %% "scalatest" % "1.9.1" excludeAll(ExclusionRule(organization="org.scala-lang")),
     "com.typesafe.akka" %% "akka-actor" % "2.1.4"
 )
 

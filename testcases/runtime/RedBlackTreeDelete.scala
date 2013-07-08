@@ -2,7 +2,7 @@ import scala.collection.immutable.Set
 import leon.Annotations._
 import leon.Utils._
 
-object RedBlackTree {
+object RedBlackTreeDelete {
   sealed abstract class Color
   case class Red() extends Color
   case class Black() extends Color
@@ -99,6 +99,14 @@ object RedBlackTree {
     }
   }
 
+  def deleteSynth(x: Int, t: Tree): Tree = {
+    require(redNodesHaveBlackChildren(t) && blackBalanced(t))
+
+    choose {
+      (res: Tree) => content(res) == content(t) -- Set(x) && redNodesHaveBlackChildren(res) && blackBalanced(res)
+    }
+  }
+
   def balance(c: Color, a: Tree, x: Int, b: Tree): Tree = {
     Node(c,a,x,b) match {
       case Node(Black(),Node(Red(),Node(Red(),a,xV,b),yV,c),zV,d) => 
@@ -113,8 +121,8 @@ object RedBlackTree {
     }
   } ensuring (res => content(res) == content(Node(c,a,x,b)))// && redDescHaveBlackChildren(res))
 
-  def main(args: Array[String]): Unit = {
-    val e = 42
+  def main(args: Array[String]) {
+    val e = 1
 
     val tree0  = (Empty(): Tree)
     val tree1  = add(1, tree0)
@@ -128,18 +136,16 @@ object RedBlackTree {
     val tree9  = add(9, tree8)
     val tree10 = add(10, tree9)
 
-    addSynth(e, tree0)
-    addSynth(e, tree1)
-    addSynth(e, tree2)
-    addSynth(e, tree3)
-    addSynth(e, tree4)
-    addSynth(e, tree5)
-    addSynth(e, tree6)
-    addSynth(e, tree7)
-    addSynth(e, tree8)
-    addSynth(e, tree9)
-    addSynth(e, tree10)
-
-    ()
+    deleteSynth(e, tree0)
+    deleteSynth(e, tree1)
+    deleteSynth(e, tree2)
+    deleteSynth(e, tree3)
+    deleteSynth(e, tree4)
+    deleteSynth(e, tree5)
+    deleteSynth(e, tree6)
+    deleteSynth(e, tree7)
+    deleteSynth(e, tree8)
+    deleteSynth(e, tree9)
+    deleteSynth(e, tree10)
   }
 }
