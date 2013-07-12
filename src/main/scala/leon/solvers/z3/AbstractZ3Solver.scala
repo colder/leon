@@ -16,7 +16,7 @@ import scala.collection.mutable.{Set => MutableSet}
 
 // This is just to factor out the things that are common in "classes that deal
 // with a Z3 instance"
-trait AbstractZ3Solver extends solvers.IncrementalSolverBuilder {
+trait AbstractZ3Solver extends solvers.IncrementalSolverBuilder with solvers.ProofGeneratingSolverBuilder {
   self: leon.solvers.Solver =>
 
   val context : LeonContext

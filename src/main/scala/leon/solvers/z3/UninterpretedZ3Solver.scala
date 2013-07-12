@@ -79,7 +79,7 @@ class UninterpretedZ3Solver(context : LeonContext) extends Solver(context) with 
     result
   }
 
-  def getNewSolver = new solvers.IncrementalSolver {
+  def getNewSolver = new solvers.IncrementalSolver with solvers.ProofGeneratingSolver {
     initZ3
 
     val solver = z3.mkSolver
@@ -105,6 +105,12 @@ class UninterpretedZ3Solver(context : LeonContext) extends Solver(context) with 
 
     def check: Option[Boolean] = {
       solver.check
+    }
+
+    def getProof: Option[Expr] = {
+      println(solver.getProof)
+
+      None
     }
 
     def checkAssumptions(assumptions: Set[Expr]): Option[Boolean] = {

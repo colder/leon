@@ -11,32 +11,46 @@ import leon.purescala.Trees._
 import leon.purescala.TreeOps._
 import leon.purescala.TypeTrees._
 
-import leon.solvers.Solver
+import leon.solvers._
 import leon.solvers.z3.FairZ3Solver
 
 import org.scalatest.FunSuite
 
-class FairZ3SolverTests extends FunSuite {
+class FairZ3SolverProofTests extends FunSuite {
   private var testCounter : Int = 0
-  private def solverCheck(solver : Solver, expr : Expr, expected : Option[Boolean], msg : String) = {
+  private def solverCheck(solver : ProofGeneratingSolverBuilder, expr : Expr, expected : Option[Boolean], msg : String) = {
     testCounter += 1
 
     test("Solver test #" + testCounter) {
-      assert(solver.solve(expr) === expected, msg)
+      val sub = solver.getNewSolver
+
+      sub.assertCnstr(Not(expr))
+
+      val res = sub.check
+
+      if (res == Some(true)) {
+        println("MODEL: "+sub.getModel)
+      }
+
+      if (res == Some(false)) {
+        println("PROOF: "+sub.getProof)
+      }
+
+      assert(res === expected.map(!_), msg)
     }
   }
 
-  private def assertValid(solver : Solver, expr : Expr) = solverCheck(
+  private def assertValid(solver : ProofGeneratingSolverBuilder, expr : Expr) = solverCheck(
     solver, expr, Some(true),
     "Solver should prove the formula " + expr + " valid."
   )
 
-  private def assertInvalid(solver : Solver, expr : Expr) = solverCheck(
+  private def assertInvalid(solver : ProofGeneratingSolverBuilder, expr : Expr) = solverCheck(
     solver, expr, Some(false),
     "Solver should prove the formula " + expr + " invalid."
   )
 
-  private def assertUnknown(solver : Solver, expr : Expr) = solverCheck(
+  private def assertUnknown(solver : ProofGeneratingSolverBuilder, expr : Expr) = solverCheck(
     solver, expr, None,
     "Solver should not be able to decide the formula " + expr + "."
   )
@@ -61,6 +75,7 @@ class FairZ3SolverTests extends FunSuite {
 
   private val solver = new FairZ3Solver(silentContext)
   solver.setProgram(minimalProgram)
+  solver.restartZ3
 
   private val tautology1 : Expr = BooleanLiteral(true)
   assertValid(solver, tautology1)
@@ -93,20 +108,27 @@ class FairZ3SolverTests extends FunSuite {
     val f = And(b1, Not(b2))
 
     locally {
-      val (result, model) = solver.solveSAT(f)
-      assert(result === Some(true))
+      val sub = solver.getNewSolver
+      sub.assertCnstr(f)
+      assert(sub.check === Some(true))
     }
 
     locally {
-      val (result, model, core) = solver.solveSATWithCores(f, Set(b1))
+      val sub = solver.getNewSolver
+      sub.assertCnstr(f)
+      val result = sub.checkAssumptions(Set(b1))
+
       assert(result === Some(true))
-      assert(core.isEmpty)
+      assert(sub.getUnsatCore.isEmpty)
     }
 
     locally {
-      val (result, model, core) = solver.solveSATWithCores(f, Set(b1, b2))
+      val sub = solver.getNewSolver
+      sub.assertCnstr(f)
+
+      val result = sub.checkAssumptions(Set(b1, b2))
       assert(result === Some(false))
-      assert(core === Set(b2))
+      assert(sub.getUnsatCore === Set(b2))
     }
   }
 }

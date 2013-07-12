@@ -370,7 +370,7 @@ class FairZ3Solver(context : LeonContext)
     }
   }
 
-  def getNewSolver = new solvers.IncrementalSolver {
+  def getNewSolver = new solvers.IncrementalSolver with solvers.ProofGeneratingSolver {
     private val evaluator    = enclosing.evaluator
     private val feelingLucky = enclosing.feelingLucky
     private val checkModels  = enclosing.checkModels
@@ -419,12 +419,10 @@ class FairZ3Solver(context : LeonContext)
       fairCheck(Set())
     }
 
-    override def getProof = {
-
+    def getProof: Option[Expr] = {
       println(solver.getProof)
 
       None
-                 
     }
 
     def checkAssumptions(assumptions: Set[Expr]): Option[Boolean] = {
