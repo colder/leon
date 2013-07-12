@@ -84,7 +84,7 @@ class FairZ3Solver(context : LeonContext)
   protected[leon] val z3cfg = new Z3Config(
     "MODEL" -> true,
     "MBQI" -> false,
-    "PROOF_MODE" -> 1,
+    //"PROOF_MODE" -> 1,
     "TYPE_CHECK" -> true,
     "WELL_SORTED_CHECK" -> true
   )
@@ -292,6 +292,8 @@ class FairZ3Solver(context : LeonContext)
       // define an activating boolean...
       val template = getTemplate(expr)
 
+        println(template)
+
       val z3args = for (vd <- template.funDef.args) yield {
         exprToZ3Id.get(Variable(vd.id)) match {
           case Some(ast) =>
@@ -309,6 +311,8 @@ class FairZ3Solver(context : LeonContext)
       // undefined (or false) these clauses have no effect...
       val (newClauses, newBlocks) =
         template.instantiate(template.z3ActivatingBool, z3args)
+
+      println(newClauses)
 
       for((i, fis) <- newBlocks) {
         registerBlocker(nextGeneration(0), i, fis)
@@ -435,6 +439,8 @@ class FairZ3Solver(context : LeonContext)
     var definitiveCore   : Set[Expr] = Set.empty
 
     def assertCnstr(expression: Expr) {
+      println("ASSERTING: "+expression)
+
       varsInVC ++= variablesOf(expression)
 
       frameExpressions = (expression :: frameExpressions.head) :: frameExpressions.tail
@@ -442,6 +448,7 @@ class FairZ3Solver(context : LeonContext)
       val newClauses = unrollingBank.scanForNewTemplates(expression)
 
       for (cl <- newClauses) {
+        println("ASSERTING: "+cl)
         solver.assertCnstr(cl)
       }
     }
@@ -498,7 +505,12 @@ class FairZ3Solver(context : LeonContext)
 
         z3Time.start
         solver.push() // FIXME: remove when z3 bug is fixed
+        println("Checking WITH ASSUMPTIONS: "+(assumptionsAsZ3 ++ unrollingBank.z3CurrentZ3Blockers))
+        for (c <- solver.getAssertions) {
+          println("ASSERTION: "+c)
+        }
         val res = solver.checkAssumptions((assumptionsAsZ3 ++ unrollingBank.z3CurrentZ3Blockers) :_*)
+        println("RESULT: "+res)
         solver.pop()  // FIXME: remove when z3 bug is fixed
         z3Time.stop
 

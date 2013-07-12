@@ -123,7 +123,15 @@ class FunctionTemplate private(
     val (from, to) = idSubstMap.unzip
     val (fromArray, toArray) = (from.toArray, to.toArray)
 
+    println("BEFORE SUBST:")
+    println(idSubstMap)
+    println(asZ3Clauses)
+
     val newClauses  = asZ3Clauses.map(z3.substitute(_, fromArray, toArray))
+
+    println("AFTER SUBST:")
+    println(newClauses)
+
     val newBlockers = z3Blockers.map { case (b, funs) =>
       val bp = if (b == z3ActivatingBool) {
         aVar
