@@ -15,16 +15,17 @@ object SortedList {
     case Nil => Set()
   }
 
-  def isSorted(l: List): Boolean = l match {
-    case Cons(h1, t1 @ Cons(h2, t2)) =>
-      h1 <= h2 && isSorted(t1)
-    case _ =>
-      true
+  case class CachedList(last: Int, data: List)
+
+  def inv(cl: CachedList) = content(cl.data) contains cl.last || cl.data == Nil
+
+  def cached(l: List): CachedList = choose {
+    (x: CachedList) => isCachedList(x) && content(x.data) == content(l)
   }
 
-  def insertSynth(l: List, i: Int): List = {
-    require(isSorted(l))
-    choose{ (x: List) => content(x) == content(l) ++ Set(i) && isSorted(x) }
+  def insertSynth(l: CachedList, i: Int): List = {
+    require(inv(l))
+    choose{ (x: CachedList) => content(x.data) == content(l.data) ++ Set(i) && inv(x) }
   }
 
   def main(args: Array[String]) {

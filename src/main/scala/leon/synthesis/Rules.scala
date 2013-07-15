@@ -14,10 +14,12 @@ object Rules {
     Unification.DecompTrivialClash,
     Unification.OccursCheck, // probably useless
     Disunification.Decomp,
+//    ChooseCloser,
     ADTDual,
     OnePoint,
     Ground,
     CaseSplit,
+    IntegerSignSplit,
     UnusedInput,
     UnconstrainedOutput,
     OptimisticGround,

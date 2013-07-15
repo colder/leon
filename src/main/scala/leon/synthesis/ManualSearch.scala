@@ -4,6 +4,7 @@ package leon
 package synthesis
 
 import leon.purescala.ScalaPrinter
+import search.AndOrGraphPartialSolution
 
 class ManualSearch(synth: Synthesizer,
                    problem: Problem,
@@ -108,6 +109,7 @@ class ManualSearch(synth: Synthesizer,
               cmdQueue = cmdQueue.tail
               n
             }
+
             if (line == "q") {
               continue = false
               res = None
@@ -165,6 +167,8 @@ class ManualSearch(synth: Synthesizer,
         res
     }
   }
+
+  var closeNext = false
 
   override def searchStep() {
     super.searchStep()
