@@ -1,0 +1,129 @@
+--------------------------------------------------------------------------------
+[1m ┐ ⟦ l,  ⟨ ((sizeA(res) == size(l)) ∧ addressBookInvariant(res)) ⟩ res ⟧ [0m
+ 0 ┈ As Choose
+ 1 ┈ Optimistic Ground
+ 2 ┈ CEGIS
+ 3 ┈ Detuple Out
+ 4 ┈ ADT Split on 'l'
+ 5 ┈ Condition abduction
+ 6 ┈ ADT Long Induction on 'l'
+ 7 ┈ ADT Induction on 'l'
+--------------------------------------------------------------------------------
+Next action? (q to quit)  $ [[34m Info  [0m] [R: Condition abduction synthesis (two phase).] Got: ⟦ l,  ⟨ ((sizeA(res) == size(l)) ∧ addressBookInvariant(res)) ⟩ res ⟧ 
+[[34m Info  [0m] Synthesizer:
+[[34m Info  [0m] numberOfBooleanSnippets: 20
+[[34m Info  [0m] numberOfCounterExamplesToGenerate: 1
+[[34m Info  [0m] holeFunDef: @post: ((sizeA(#res) == size(l)) ∧ addressBookInvariant(#res))
+          def makeAddressBook(l : List) : AddressBook = choose(res => ((sizeA(res) == size(l)) ∧ addressBookInvariant(res)))
+[[34m Info  [0m] problem: ⟦ l,  ⟨ ((sizeA(res) == size(l)) ∧ addressBookInvariant(res)) ⟩ res ⟧ 
+[[34m Info  [0m] Synthesis called on files: List(testcases/synthesis/oopsla2013/AddressBook/AddressesMakeAddressBook.scala)
+[[34m Info  [0m] Initializing synthesizer: 
+[[34m Info  [0m] numberOfBooleanSnippets: 20
+[[34m Info  [0m] numberOfCounterExamplesToGenerate: 1
+[[34m Info  [0m] Synthesizer initialized
+[[34m Info  [0m] Invoking synthesis for branch expressions
+[[34m Info  [0m] ####################################
+[[34m Info  [0m] ######Iteration #1 ###############
+[[34m Info  [0m] ####################################
+[[34m Info  [0m] # precondition is: true
+[[34m Info  [0m] # accumulatingCondition is: true
+[[34m Info  [0m] # accumulatingExpression(Unit) is: ()
+[[34m Info  [0m] ####################################
+[[34m Info  [0m] Going into a enumeration/testing phase.
+[[34m Info  [0m] numberOfTested: 0
+[[34m Info  [0m] Got candidates of size: 8
+[[34m Info  [0m] Ranking candidates...
+[[34m Info  [0m] candidate with the most successfull evaluations is: AddressBook(Nil, l) with pass count 35 out of 100
+[[34m Info  [0m] Current candidate solution is:
+          @pre : true
+          @post: ((sizeA(#res) == size(l)) ∧ addressBookInvariant(#res))
+          def makeAddressBook(l : List) : AddressBook = AddressBook(Nil, l)
+[[34m Info  [0m] Invoking synthesis for condition expressions
+stream is here!
+[[34m Info  [0m] Trying: l.isInstanceOf[Nil] as a condition.
+[[34m Info  [0m] We found a branch, for expression AddressBook(Nil, l), with condition l.isInstanceOf[Nil].
+[[34m Info  [0m] We do variable refinement for l
+[[34m Info  [0m] Variable is refined.
+[[34m Info  [0m] Precondition Some(¬(l.isInstanceOf[Nil])) found for AddressBook(Nil, l)
+[[34m Info  [0m] Variable refined, doing branch synthesis again
+[[34m Info  [0m] Invoking synthesis for branch expressions
+[[34m Info  [0m] Filtering based on precondition: ¬(l.isInstanceOf[Nil])
+[[34m Info  [0m] ####################################
+[[34m Info  [0m] ######Iteration #2 ###############
+[[34m Info  [0m] ####################################
+[[34m Info  [0m] # precondition is: ¬(l.isInstanceOf[Nil])
+[[34m Info  [0m] # accumulatingCondition is: ¬(l.isInstanceOf[Nil])
+[[34m Info  [0m] # accumulatingExpression(Unit) is: if (l.isInstanceOf[Nil])
+            AddressBook(Nil, l)
+          else
+            ()
+[[34m Info  [0m] ####################################
+[[34m Info  [0m] Going into a enumeration/testing phase.
+[[34m Info  [0m] numberOfTested: 0
+[[34m Info  [0m] Got candidates of size: 45
+[[34m Info  [0m] Ranking candidates...
+[[34m Info  [0m] candidate with the most successfull evaluations is: AddressBook(Nil, l) with pass count 34 out of 99
+[[34m Info  [0m] Current candidate solution is:
+          @pre : true
+          @post: ((sizeA(#res) == size(l)) ∧ addressBookInvariant(#res))
+          def makeAddressBook(l : List) : AddressBook = if (l.isInstanceOf[Nil])
+            AddressBook(Nil, l)
+          else
+            AddressBook(Nil, l)
+[[34m Info  [0m] Invoking synthesis for condition expressions
+stream is here!
+[[34m Info  [0m] Trying: allPrivate(l.tail) as a condition.
+Successful(false)
+[[34m Info  [0m] Trying: l.a.priv as a condition.
+Successful(false)
+[[34m Info  [0m] Trying: allBusiness(l.tail) as a condition.
+Successful(false)
+[[34m Info  [0m] Trying: addressBookInvariant(makeAddressBook(l.tail)) as a condition.
+Successful(false)
+[[34m Info  [0m] Trying: isEmpty(makeAddressBook(l.tail)) as a condition.
+Successful(false)
+[[34m Info  [0m] Trying: l.a.info.local as a condition.
+Successful(false)
+[[34m Info  [0m] Trying: l.a.priv as a condition.
+Successful(false)
+[[34m Info  [0m] Trying: allPrivate(l.tail) as a condition.
+Successful(false)
+[[34m Info  [0m] Trying: allBusiness(l.tail) as a condition.
+Successful(false)
+[[34m Info  [0m] Trying: l.isInstanceOf[Nil] as a condition.
+[[34m Info  [0m] Trying: ¬(allPrivate(l.tail)) as a condition.
+Successful(false)
+[[34m Info  [0m] Trying: allPrivate(l) as a condition.
+[[34m Info  [0m] We found a branch, for expression AddressBook(Nil, l), with condition allPrivate(l).
+[[34m Info  [0m] Precondition Some((¬(l.isInstanceOf[Nil]) ∧ ¬(allPrivate(l)))) found for AddressBook(Nil, l)
+[[34m Info  [0m] Filtering based on precondition: (¬(l.isInstanceOf[Nil]) ∧ ¬(allPrivate(l)))
+[[34m Info  [0m] ####################################
+[[34m Info  [0m] ######Iteration #3 ###############
+[[34m Info  [0m] ####################################
+[[34m Info  [0m] # precondition is: (¬(l.isInstanceOf[Nil]) ∧ ¬(allPrivate(l)))
+[[34m Info  [0m] # accumulatingCondition is: (¬(l.isInstanceOf[Nil]) ∧ ¬(allPrivate(l)))
+[[34m Info  [0m] # accumulatingExpression(Unit) is: if (l.isInstanceOf[Nil])
+            AddressBook(Nil, l)
+          else
+            if (allPrivate(l))
+              AddressBook(Nil, l)
+            else
+              ()
+[[34m Info  [0m] ####################################
+[[34m Info  [0m] Going into a enumeration/testing phase.
+[[34m Info  [0m] numberOfTested: 0
+[[34m Info  [0m] Got candidates of size: 81
+[[34m Info  [0m] Ranking candidates...
+[[34m Info  [0m] candidate with the most successfull evaluations is: AddressBook(Cons(l.a, Nil), l.tail) with pass count 28 out of 65
+[[34m Info  [0m] Current candidate solution is:
+          @pre : true
+          @post: ((sizeA(#res) == size(l)) ∧ addressBookInvariant(#res))
+          def makeAddressBook(l : List) : AddressBook = if (l.isInstanceOf[Nil])
+            AddressBook(Nil, l)
+          else
+            if (allPrivate(l))
+              AddressBook(Nil, l)
+            else
+              AddressBook(Cons(l.a, Nil), l.tail)
+[[34m Info  [0m] Invoking synthesis for condition expressions
+[[34m Info  [0m] Trying: allPrivate(l.tail) as a condition.
