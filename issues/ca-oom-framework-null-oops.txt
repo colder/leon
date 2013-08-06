@@ -1,0 +1,102 @@
+produced after selecting CA in manual mode, getting out-of-memory, then exiting with Ctrl-C Ctrl-C.
+
+./leon --synthesis --manual testcases/synthesis/oopsla2013/AddressBook/AddressesMergeAddressBooks.scala 
+=================
+
+[ Info  ] No precondition found for branch expression: AddressBook(ab2.business, merge(Nil, merge(ab2.pers, ab1.pers)))
+[ Info  ] numberOfTested: 12750
+[ Info  ] Got candidates of size: 7861
+[ Info  ] Ranking candidates...
+[Warning] Condition abduction crashed: PermGen space
+java.lang.OutOfMemoryError: PermGen space
+	at sun.misc.Unsafe.defineClass(Native Method)
+	at sun.reflect.ClassDefiner.defineClass(ClassDefiner.java:63)
+	at sun.reflect.MethodAccessorGenerator$1.run(MethodAccessorGenerator.java:399)
+	at sun.reflect.MethodAccessorGenerator$1.run(MethodAccessorGenerator.java:396)
+	at java.security.AccessController.doPrivileged(Native Method)
+	at sun.reflect.MethodAccessorGenerator.generate(MethodAccessorGenerator.java:395)
+	at sun.reflect.MethodAccessorGenerator.generateMethod(MethodAccessorGenerator.java:77)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:46)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:601)
+	at leon.codegen.CompiledExpression.evalToJVM(CompiledExpression.scala:51)
+	at leon.codegen.CompiledExpression.evalFromJVM(CompiledExpression.scala:59)
+	at leon.codegen.CompiledExpression.eval(CompiledExpression.scala:71)
+	at leon.evaluators.CodeGenEvaluator$$anonfun$compile$1.apply(CodeGenEvaluator.scala:40)
+	at leon.evaluators.CodeGenEvaluator$$anonfun$compile$1.apply(CodeGenEvaluator.scala:38)
+	at lesynth.evaluation.CodeGenExampleRunner.evaluate(CodeGenExampleRunner.scala:89)
+	at lesynth.evaluation.CodeGenExampleRunner.evaluate(CodeGenExampleRunner.scala:56)
+	at lesynth.ranking.Evaluation.evaluate(Evaluation.scala:29)
+	at lesynth.ranking.Ranker.evaluate(Ranker.scala:26)
+	at lesynth.ranking.Ranker.getMax(Ranker.scala:58)
+	at lesynth.SynthesizerForRuleExamples$$anonfun$synthesize$1$$anonfun$apply$mcV$sp$1.apply$mcV$sp(SynthesizerExamples.scala:210)
+	at scala.util.control.Breaks.breakable(Breaks.scala:37)
+	at lesynth.SynthesizerForRuleExamples$$anonfun$synthesize$1.apply$mcV$sp(SynthesizerExamples.scala:170)
+	at scala.util.control.Breaks.breakable(Breaks.scala:37)
+	at lesynth.SynthesizerForRuleExamples.synthesize(SynthesizerExamples.scala:150)
+	at lesynth.rules.ConditionAbductionSynthesisTwoPhase$$anon$1.apply(ConditionAbductionSynthesisTwoPhase.scala:66)
+	at leon.synthesis.SimpleSearch.expandAndTask(SimpleSearch.scala:55)
+	at leon.synthesis.SimpleSearch.searchStep(SimpleSearch.scala:195)
+	at leon.synthesis.ManualSearch.searchStep(ManualSearch.scala:170)
+	at leon.synthesis.SimpleSearch.search(SimpleSearch.scala:210)
+	at leon.synthesis.Synthesizer.synthesize(Synthesizer.scala:71)
+	at leon.synthesis.SynthesisPhase$$anonfun$5.apply(SynthesisPhase.scala:144)
+[ Info  ] [R: Condition abduction synthesis (two phase).] Failed
+--------------------------------------------------------------------------------
+ ┐ ⟦ ab1;ab2, (addressBookInvariant(ab1) ∧ addressBookInvariant(ab2) ∧ ab1.isInstanceOf[AddressBook] ∧ ab2.isInstanceOf[AddressBook]) ≺  ⟨ ((sizeA(res) == (sizeA(ab1) + sizeA(ab2))) ∧ addressBookInvariant(res)) ⟩ res ⟧ 
+ 0 ┈ As Choose
+ 1 ┈ Optimistic Ground
+ 2 ┈ Eq. Split on 'ab1' and 'ab2'
+ 3 ┈ CEGIS
+ 4 ┈ Detuple Out
+ 5 ┈ Detuple In
+ 6 ┈ Condition abduction
+--------------------------------------------------------------------------------
+Next action? (q to quit)  $ [ Error ] Woops: null
+java.lang.NullPointerException
+	at leon.synthesis.ManualSearch.nextLeaf(ManualSearch.scala:114)
+	at leon.synthesis.SimpleSearch.searchStep(SimpleSearch.scala:191)
+	at leon.synthesis.ManualSearch.searchStep(ManualSearch.scala:170)
+	at leon.synthesis.SimpleSearch.search(SimpleSearch.scala:210)
+	at leon.synthesis.Synthesizer.synthesize(Synthesizer.scala:71)
+	at leon.synthesis.SynthesisPhase$$anonfun$5.apply(SynthesisPhase.scala:144)
+	at leon.synthesis.SynthesisPhase$$anonfun$5.apply(SynthesisPhase.scala:143)
+	at scala.collection.TraversableLike$$anonfun$map$1.apply(TraversableLike.scala:244)
+	at scala.collection.TraversableLike$$anonfun$map$1.apply(TraversableLike.scala:244)
+	at scala.collection.immutable.List.foreach(List.scala:318)
+	at scala.collection.TraversableLike$class.map(TraversableLike.scala:244)
+	at scala.collection.AbstractTraversable.map(Traversable.scala:105)
+	at leon.synthesis.SynthesisPhase$.run(SynthesisPhase.scala:143)
+	at leon.synthesis.SynthesisPhase$.run(SynthesisPhase.scala:16)
+	at leon.Pipeline$$anon$1.run(Pipeline.scala:9)
+	at leon.Pipeline$$anon$1.run(Pipeline.scala:9)
+	at leon.Main$.main(Main.scala:164)
+	at leon.Main.main(Main.scala)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:57)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:601)
+	at scala.tools.nsc.util.ScalaClassLoader$$anonfun$run$1.apply(ScalaClassLoader.scala:71)
+	at scala.tools.nsc.util.ScalaClassLoader$class.asContext(ScalaClassLoader.scala:31)
+	at scala.tools.nsc.util.ScalaClassLoader$URLClassLoader.asContext(ScalaClassLoader.scala:139)
+	at scala.tools.nsc.util.ScalaClassLoader$class.run(ScalaClassLoader.scala:71)
+	at scala.tools.nsc.util.ScalaClassLoader$URLClassLoader.run(ScalaClassLoader.scala:139)
+	at scala.tools.nsc.CommonRunner$class.run(ObjectRunner.scala:28)
+	at scala.tools.nsc.ObjectRunner$.run(ObjectRunner.scala:45)
+	at scala.tools.nsc.CommonRunner$class.runAndCatch(ObjectRunner.scala:35)
+	at scala.tools.nsc.ObjectRunner$.runAndCatch(ObjectRunner.scala:45)
+	at scala.tools.nsc.MainGenericRunner.runTarget$1(MainGenericRunner.scala:74)
+	at scala.tools.nsc.MainGenericRunner.process(MainGenericRunner.scala:96)
+	at scala.tools.nsc.MainGenericRunner$.main(MainGenericRunner.scala:105)
+	at scala.tools.nsc.MainGenericRunner.main(MainGenericRunner.scala)
+--------------------------------------------------------------------------------
+ ┐ ⟦ ab1;ab2, (addressBookInvariant(ab1) ∧ addressBookInvariant(ab2) ∧ ab1.isInstanceOf[AddressBook] ∧ ab2.isInstanceOf[AddressBook]) ≺  ⟨ ((sizeA(res) == (sizeA(ab1) + sizeA(ab2))) ∧ addressBookInvariant(res)) ⟩ res ⟧ 
+ 0 ┈ As Choose
+ 1 ┈ Optimistic Ground
+ 2 ┈ Eq. Split on 'ab1' and 'ab2'
+ 3 ┈ CEGIS
+ 4 ┈ Detuple Out
+ 5 ┈ Detuple In
+ 6 ┈ Condition abduction
+--------------------------------------------------------------------------------
+Next action? (q to quit)  $ ^C^C^C
