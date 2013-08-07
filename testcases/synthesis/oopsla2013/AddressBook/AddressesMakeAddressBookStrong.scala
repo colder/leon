@@ -20,12 +20,10 @@ object Addresses {
     case Cons(addr, l1) => Set(addr) ++ content(l1)
   }
 
-/*  
 	def size(l: List) : Int = l match {
 	  case Nil => 0
 	  case Cons(head, tail) => 1 + size(tail)
 	}
-*/
 	
   def allPrivate(l: List): Boolean = l match {
     case Nil => true
@@ -43,7 +41,7 @@ object Addresses {
 
   case class AddressBook(business : List, pers : List)
   
-//  def sizeA(ab: AddressBook): Int = size(ab.business) + size(ab.pers)
+  def sizeA(ab: AddressBook): Int = size(ab.business) + size(ab.pers)
   		 
 //  def isEmpty(ab: AddressBook) = sizeA(ab) == 0
   
@@ -95,11 +93,35 @@ object Addresses {
 //		    hasPrivate(res.pers)
 //		  } else true )
 //  }
-  
+
+/* 
+ // MANUAL SOLUTION:
+  def makeAB(l:List) : AddressBook = {
+    l match {
+      case Nil => AddressBook(Nil,Nil)
+      case Cons(a,t) => {
+	val ab1 = makeAB(t)
+	if (a.priv) AddressBook(ab1.business, Cons(a,ab1.pers))
+	else AddressBook(Cons(a,ab1.business), ab1.pers)
+      }
+    }
+  } ensuring((res: AddressBook) =>
+	        sizeA(res) == size(l) && 
+                addressBookInvariant(res) &&
+                contentA(res) == content(l))
+
+*/
+
+/* // Perhaps this can be useful?
+  def cond(b:Boolean, ab1: AddressBook, ab2: AddressBook) : AddressBook = {
+    if (b) ab1 else ab2
+  }
+*/
+
   def makeAddressBook(l: List): AddressBook = 
 		choose {
     (res: AddressBook) =>
-		  // sizeA(res) == size(l) && 
+		  sizeA(res) == size(l) && 
                   addressBookInvariant(res) &&
                   contentA(res) == content(l)
   }
