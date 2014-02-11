@@ -274,15 +274,79 @@ object TreeOps {
     foldRight[Int]({ (e, subs) =>  matcher(e) + subs.foldLeft(0)(_ + _) } )(e)
   }
 
+  var called = 0;
+
+  def optimizedReplace(m: Map[Expr, Expr], e: Expr): Expr = {
+    called += 1
+    if (called %100 == 0) {
+      println("Called "+called+" times...")
+    }
+
+    def tagMatch(e: Expr, t: (Long, Long)) = {
+      ((e.tags._1 & t._1) == t._1) &&
+      ((e.tags._2 & t._2) == t._2)
+    }
+
+    val newM = m.filter { case (k, v) => tagMatch(e, k.tags) }
+
+    val tags = newM.keys.map(k => (k, k.tags)).toMap
+
+
+    def tagMayMatch(e: Expr) = {
+      tags.values.exists(tagMatch(e, _))
+    }
+
+    def rec(e: Expr): Expr = {
+      if (tagMayMatch(e)) {
+        val newV = e match {
+          case u @ UnaryOperator(e, builder) =>
+            val newE = rec(e)
+
+            if (newE ne e) {
+              builder(newE).copiedFrom(u)
+            } else {
+              u
+            }
+
+          case b @ BinaryOperator(e1, e2, builder) =>
+            val newE1 = rec(e1)
+            val newE2 = rec(e2)
+
+            if ((newE1 ne e1) || (newE2 ne e2)) {
+              builder(newE1, newE2).copiedFrom(b)
+            } else {
+              b
+            }
+
+          case n @ NAryOperator(es, builder) =>
+            val newEs = es.map(rec)
+
+            if ((newEs zip es).exists { case (bef, aft) => aft ne bef }) {
+              builder(newEs).copiedFrom(n)
+            } else {
+              n
+            }
+
+          case t: Terminal =>
+            t
+        }
+
+        newM.getOrElse(newV, newV)
+
+      } else {
+        e
+      }
+    }
+
+    rec(e)
+  }
+
   def replace(substs: Map[Expr,Expr], expr: Expr) : Expr = {
-    postMap(substs.lift)(expr)
+    optimizedReplace(substs, expr)
   }
 
   def replaceFromIDs(substs: Map[Identifier, Expr], expr: Expr) : Expr = {
-    postMap( {
-        case Variable(i) => substs.get(i)
-        case _ => None
-    })(expr)
+    optimizedReplace(substs.map{ case(k, v) => (Variable(k), v) }, expr)
   }
 
   def variablesOf(expr: Expr): Set[Identifier] = {

@@ -17,7 +17,7 @@ object Trees {
     sb
   }
 
-  case class Block(exprs: Seq[Expr], last: Expr) extends Expr with NAryExtractable with PrettyPrintable with FixedType {
+  case class Block(exprs: Seq[Expr], last: Expr) extends Expr with NAryExtractable with PrettyPrintable with FixedType with NoTag {
     def extract: Option[(Seq[Expr], (Seq[Expr])=>Expr)] = {
       val Block(args, rest) = this
       Some((args :+ rest, exprs => Block(exprs.init, exprs.last)))
@@ -37,7 +37,7 @@ object Trees {
     val fixedType = last.getType
   }
 
-  case class Assignment(varId: Identifier, expr: Expr) extends Expr with FixedType with UnaryExtractable with PrettyPrintable {
+  case class Assignment(varId: Identifier, expr: Expr) extends Expr with FixedType with UnaryExtractable with PrettyPrintable  with NoTag {
     val fixedType = UnitType
 
     def extract: Option[(Expr, (Expr)=>Expr)] = {
@@ -53,7 +53,7 @@ object Trees {
     }
   }
 
-  case class While(cond: Expr, body: Expr) extends Expr with FixedType with BinaryExtractable with PrettyPrintable {
+  case class While(cond: Expr, body: Expr) extends Expr with FixedType with BinaryExtractable with PrettyPrintable with NoTag {
     val fixedType = UnitType
     var invariant: Option[Expr] = None
 
@@ -86,7 +86,7 @@ object Trees {
     }
   }
 
-  case class Epsilon(pred: Expr) extends Expr with UnaryExtractable with PrettyPrintable {
+  case class Epsilon(pred: Expr) extends Expr with UnaryExtractable with PrettyPrintable with NoTag {
     def extract: Option[(Expr, (Expr)=>Expr)] = {
       Some((pred, (expr: Expr) => Epsilon(expr).setType(this.getType).setPos(this)))
     }
@@ -104,7 +104,7 @@ object Trees {
     }
   }
 
-  case class EpsilonVariable(pos: Position) extends Expr with Terminal with PrettyPrintable{
+  case class EpsilonVariable(pos: Position) extends Expr with Terminal with PrettyPrintable with NoTag {
 
     def printWith(printer: PrettyPrinter)(implicit lvl: Int) {
       printer.append("x" + pos.line + "_" + pos.col)
@@ -112,7 +112,7 @@ object Trees {
   }
 
   //same as let, buf for mutable variable declaration
-  case class LetVar(binder: Identifier, value: Expr, body: Expr) extends Expr with BinaryExtractable with PrettyPrintable {
+  case class LetVar(binder: Identifier, value: Expr, body: Expr) extends Expr with BinaryExtractable with PrettyPrintable with NoTag {
     binder.markAsLetBinder
     val et = body.getType
     if(et != Untyped)
@@ -150,7 +150,7 @@ object Trees {
     }
   }
 
-  case class Waypoint(i: Int, expr: Expr) extends Expr with UnaryExtractable with PrettyPrintable {
+  case class Waypoint(i: Int, expr: Expr) extends Expr with UnaryExtractable with PrettyPrintable with NoTag {
     def extract: Option[(Expr, (Expr)=>Expr)] = {
       Some((expr, (e: Expr) => Waypoint(i, e)))
     }
@@ -170,7 +170,7 @@ object Trees {
 
   //the difference between ArrayUpdate and ArrayUpdated is that the former has a side effect while the latter is the functional version
   //ArrayUpdate should be eliminated soon in the analysis while ArrayUpdated is kept all the way to the backend
-  case class ArrayUpdate(array: Expr, index: Expr, newValue: Expr) extends Expr with FixedType with NAryExtractable with PrettyPrintable {
+  case class ArrayUpdate(array: Expr, index: Expr, newValue: Expr) extends Expr with FixedType with NAryExtractable with PrettyPrintable with NoTag {
     val fixedType = UnitType
 
     def extract: Option[(Seq[Expr], (Seq[Expr])=>Expr)] = {

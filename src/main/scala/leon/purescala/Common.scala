@@ -27,9 +27,23 @@ object Common {
     }
   }
 
+  trait Tagged {
+    val tags: (Long, Long)
+
+    def tagsCombine(sub: Seq[Tagged] = Nil, selfSTag: Long = 0, selfCTag: Long = 0): (Long, Long) = {
+      sub.foldLeft((selfSTag, selfCTag)){ case ((st, ct), t) => (st | t.tags._1, ct | t.tags._2) }
+    }
+  }
+
+  trait NoTag {
+    val tags: (Long, Long) = (~0, ~0)
+  }
+
   // the type is left blank (Untyped) for Identifiers that are not variables
-  class Identifier private[Common](val name: String, private val globalId: Int, val id: Int, alwaysShowUniqueID: Boolean = false) extends Tree with Typed {
+  class Identifier private[Common](val name: String, private val globalId: Int, val id: Int, alwaysShowUniqueID: Boolean = false) extends Tree with Typed with Tagged {
     self : Serializable =>
+
+    val tags = (0l, 1l << globalId)
 
     override def equals(other: Any): Boolean = {
       if(other == null || !other.isInstanceOf[Identifier])
