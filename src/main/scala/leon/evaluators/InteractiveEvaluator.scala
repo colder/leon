@@ -12,8 +12,6 @@ import purescala.TypeTrees._
 import solvers.z3._
 import solvers._
 
-import scala.tools.jline.console._
-
 class InteractiveEvaluator(ctx: LeonContext, prog: Program) extends RecursiveEvaluator(ctx, prog) {
   type RC = DefaultRecContext
   type GC = InteractiveGlobalContext
