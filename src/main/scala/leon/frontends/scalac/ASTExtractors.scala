@@ -299,11 +299,15 @@ trait ASTExtractors {
     }
 
     object ExWithOracleExpression {
-      def unapply(tree: Apply) : Option[(List[(Tree, Symbol)], Tree)] = tree match {
+      def unapply(tree: Apply) : Option[(List[(Tree, Symbol)], Tree, Boolean)] = tree match {
         case a @ Apply(
               TypeApply(s @ ExSymbol("leon", "lang", "synthesis", "withOracle"), types),
               Function(vds, body) :: Nil) =>
-            Some(((types zip vds.map(_.symbol)).toList, body))
+            Some(((types zip vds.map(_.symbol)).toList, body, false))
+        case a @ Apply(
+              TypeApply(s @ ExSymbol("leon", "lang", "synthesis", "interactive"), types),
+              Function(vds, body) :: Nil) =>
+            Some(((types zip vds.map(_.symbol)).toList, body, true))
         case _ => None
       }
     }

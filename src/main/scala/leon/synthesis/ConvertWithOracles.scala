@@ -36,27 +36,39 @@ object ConvertWithOracle extends LeonPhase[Program, Program] {
    * }
    *
    */
+
+  def getChoose(wo: WithOracle): Option[Choose] = {
+    val WithOracle(os, b, inter) = wo
+
+    withoutSpec(b) match {
+      case Some(body) =>
+        val chooseOs = os.map(_.freshen)
+
+        val pred = postconditionOf(b) match {
+          case Some((id, post)) =>
+            replaceFromIDs((os zip chooseOs.map(_.toVariable)).toMap, Let(id, body, post))
+          case None =>
+            BooleanLiteral(true)
+        }
+
+        Some(Choose(chooseOs, pred))
+      case None =>
+        None
+    }
+  }
+
   def run(ctx: LeonContext)(pgm: Program): Program = {
 
     pgm.definedFunctions.foreach(fd => {
       if (fd.hasBody) {
         val body = preMap {
-          case wo @ WithOracle(os, b) =>
-            withoutSpec(b) match {
-              case Some(body) =>
-                val chooseOs = os.map(_.freshen)
-
-                val pred = postconditionOf(b) match {
-                  case Some((id, post)) =>
-                    replaceFromIDs((os zip chooseOs.map(_.toVariable)).toMap, Let(id, body, post))
-                  case None =>
-                    BooleanLiteral(true)
-                }
-
-                if (chooseOs.size > 1) {
-                  Some(LetTuple(os, Choose(chooseOs, pred), b))
+          case wo @ WithOracle(os, b, false) =>
+            getChoose(wo) match {
+              case Some(c) =>
+                if (os.size > 1) {
+                  Some(LetTuple(os, c, b))
                 } else {
-                  Some(Let(os.head, Choose(chooseOs, pred), b))
+                  Some(Let(os.head, c, b))
                 }
               case None =>
                 None

@@ -169,8 +169,13 @@ class PrettyPrinter(opts: PrinterOptions, val sb: StringBuffer = new StringBuffe
             |  (${typed(id)}) => $post
             |}"""
 
-      case c @ WithOracle(vars, pred) =>
+      case c @ WithOracle(vars, pred, false) =>
         p"""|withOracle { (${typed(vars)}) =>
+            |  $pred
+            |}"""
+
+      case c @ WithOracle(vars, pred, true) =>
+        p"""|interactive { (${typed(vars)}) =>
             |  $pred
             |}"""
 

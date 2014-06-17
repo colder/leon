@@ -1002,7 +1002,7 @@ trait CodeExtraction extends ASTExtractors {
               })
           }
 
-        case ops @ ExWithOracleExpression(oracles, body) =>
+        case ops @ ExWithOracleExpression(oracles, body, interactive) =>
           val newOracles = oracles map { case (tpt, sym) =>
             val aTpe  = extractType(tpt)
             val oTpe  = oracleType(ops.pos, aTpe)
@@ -1018,7 +1018,7 @@ trait CodeExtraction extends ASTExtractors {
 
           val cBody = extractTree(body)(dctx.withNewVars(newVars))
 
-          WithOracle(newOracles, cBody)
+          WithOracle(newOracles, cBody, interactive)
 
 
         case chs @ ExChooseExpression(args, body) =>

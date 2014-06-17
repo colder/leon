@@ -40,7 +40,7 @@ object RunnerPhase extends LeonPhase[Program, Unit] {
             val se = new ScalacEvaluator(ctx, pgm)
             se.call(fd.typed, Nil)
           } else {
-            val e = new DefaultEvaluator(ctx, pgm)
+            val e = new InteractiveEvaluator(ctx, pgm)
             e.eval(FunctionInvocation(fd.typed, Nil))
           }
 

@@ -54,13 +54,13 @@ object Trees {
   }
 
   // Provide an oracle (synthesizable, all-seeing choose)
-  case class WithOracle(oracles: List[Identifier], body: Expr) extends Expr with FixedType with UnaryExtractable {
+  case class WithOracle(oracles: List[Identifier], body: Expr, interactive: Boolean) extends Expr with FixedType with UnaryExtractable {
     assert(!oracles.isEmpty)
 
     val fixedType = body.getType
 
     def extract = {
-      Some((body, (e: Expr) => WithOracle(oracles, e).setPos(this)))
+      Some((body, (e: Expr) => WithOracle(oracles, e, interactive).setPos(this)))
     }
   }
 
