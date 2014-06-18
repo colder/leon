@@ -111,13 +111,13 @@ case object CEGIS extends Rule("CEGIS") {
               false
           }
 
-          val isNotSynthesizable = fd.body match {
+          val isNotSynthesizable = (sctx.program.callGraph.transitiveCallees(fd) + fd).forall(fd => fd.body match {
             case Some(b) =>
               !containsChoose(b)
 
             case None =>
               false
-          }
+          })
 
           if (!isRecursiveCall && isNotSynthesizable) {
             canBeSubtypeOf(fd.returnType, fd.tparams, t) match {
@@ -186,6 +186,28 @@ case object CEGIS extends Rule("CEGIS") {
         }
 
         allChildPaths(initGuard).toSet
+      }
+
+      // Returns all possible assignments to Bs in order to enumerate all possible programs
+      def size(): Int = {
+        def countPaths(b: Identifier): Int = {
+          if (isBClosed(b)) {
+            0
+          } else {
+            bTree.get(b) match {
+              case Some(cToBs) =>
+                val alts = cToBs.values.map { children =>
+                  children.toList.map(c => countPaths(c)).sum
+                }
+
+                alts.product
+              case None =>
+                1
+            }
+          }
+        }
+
+        countPaths(initGuard)
       }
 
       /*
@@ -451,7 +473,8 @@ case object CEGIS extends Rule("CEGIS") {
 
         val ndProgram = new NonDeterministicProgram(p, initGuard)
         var unrolings = 0
-        val maxUnrolings = 3
+        val maxUnrolings = 10
+        val ndProgramSizeLimit = 10000
 
         val exSolverTo  = 3000L
         val cexSolverTo = 3000L
@@ -598,8 +621,6 @@ case object CEGIS extends Rule("CEGIS") {
               if (prunedPrograms.isEmpty) {
                 needMoreUnrolling = true
               }
-
-              //println("Passing tests: "+prunedPrograms.size)
             }
 
             val nPassing = prunedPrograms.size
@@ -610,7 +631,11 @@ case object CEGIS extends Rule("CEGIS") {
               needMoreUnrolling = true;
             } else if (nPassing <= testUpTo) {
               // Immediate Test
-              result = Some(checkForPrograms(prunedPrograms))
+              checkForPrograms(prunedPrograms) match {
+                case rs: RuleSuccess =>
+                  result = Some(rs)
+                case _ =>
+              }
             } else if (((nPassing < allPrograms*filterThreshold) || didFilterAlready) && useBssFiltering) {
               // We filter the Bss so that the formula we give to z3 is much smalled
               val bssToKeep = prunedPrograms.foldLeft(Set[Identifier]())(_ ++ _)
@@ -759,7 +784,10 @@ case object CEGIS extends Rule("CEGIS") {
             }
 
             unrolings += 1
-          } while(unrolings < maxUnrolings && result.isEmpty && !interruptManager.isInterrupted())
+          } while(unrolings < maxUnrolings &&
+                  ndProgram.size < ndProgramSizeLimit &&
+                  result.isEmpty &&
+                  !interruptManager.isInterrupted())
 
           result.getOrElse(RuleApplicationImpossible)
 

@@ -42,11 +42,11 @@ object RPN {
         print(h+" ")
         d(t)
       case Nil() =>
-        println
     }
 
-    print(" -> ")
+    print(" Stack: [ ")
     d(s.stack)
+    println(" ], Quit = "+s.quit)
   }
 
   def replStep(state: State): State = {

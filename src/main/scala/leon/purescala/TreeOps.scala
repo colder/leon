@@ -1336,6 +1336,7 @@ object TreeOps {
   def containsChoose(e: Expr): Boolean = {
     preTraversal{
       case Choose(_, _) => return true
+      case WithOracle(_, _, _) => return true
       case _ =>
     }(e)
     false

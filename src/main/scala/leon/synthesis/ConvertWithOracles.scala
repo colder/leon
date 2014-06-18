@@ -57,46 +57,47 @@ object ConvertWithOracle extends LeonPhase[Program, Program] {
     }
   }
 
+  def convertFd(ctx: LeonContext)(fd: FunDef): Unit = {
+    if (fd.hasBody) {
+      val body = preMap {
+        case wo @ WithOracle(os, b, false) =>
+          getChoose(wo) match {
+            case Some(c) =>
+              if (os.size > 1) {
+                Some(LetTuple(os, c, b))
+              } else {
+                Some(Let(os.head, c, b))
+              }
+            case None =>
+              None
+          }
+        case _ => None
+      }(fd.body.get)
+
+      fd.body = Some(body)
+    }
+
+    // Ensure that holes are not found in pre and/or post conditions
+    fd.precondition.foreach {
+      preTraversal{
+        case _: WithOracle =>
+          ctx.reporter.error("WithOracle expressions are not supported in preconditions. (function "+fd.id.asString(ctx)+")")
+        case _ =>
+      }
+    }
+
+    fd.postcondition.foreach { case (id, post) =>
+      preTraversal{
+        case _: WithOracle =>
+          ctx.reporter.error("WithOracle expressions are not supported in postconditions. (function "+fd.id.asString(ctx)+")")
+        case _ =>
+      }(post)
+    }
+  }
+
   def run(ctx: LeonContext)(pgm: Program): Program = {
 
-    pgm.definedFunctions.foreach(fd => {
-      if (fd.hasBody) {
-        val body = preMap {
-          case wo @ WithOracle(os, b, false) =>
-            getChoose(wo) match {
-              case Some(c) =>
-                if (os.size > 1) {
-                  Some(LetTuple(os, c, b))
-                } else {
-                  Some(Let(os.head, c, b))
-                }
-              case None =>
-                None
-            }
-          case _ => None
-        }(fd.body.get)
-
-        fd.body = Some(body)
-      }
-
-      // Ensure that holes are not found in pre and/or post conditions
-      fd.precondition.foreach {
-        preTraversal{
-          case _: WithOracle =>
-            ctx.reporter.error("WithOracle expressions are not supported in preconditions. (function "+fd.id.asString(ctx)+")")
-          case _ =>
-        }
-      }
-
-      fd.postcondition.foreach { case (id, post) =>
-        preTraversal{
-          case _: WithOracle =>
-            ctx.reporter.error("WithOracle expressions are not supported in postconditions. (function "+fd.id.asString(ctx)+")")
-          case _ =>
-        }(post)
-      }
-
-    })
+    pgm.definedFunctions.foreach(convertFd(ctx))
 
     pgm
   }

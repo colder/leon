@@ -5,12 +5,15 @@ package evaluators
 
 import synthesis.ConvertWithOracle
 import purescala.Common._
+import purescala.ScalaPrinter
 import purescala.Trees._
 import purescala.Definitions._
 import purescala.TreeOps._
 import purescala.TypeTrees._
 import solvers.z3._
 import solvers._
+import utils.ConsoleUtils
+import synthesis._
 
 class InteractiveEvaluator(ctx: LeonContext, prog: Program) extends RecursiveEvaluator(ctx, prog) {
   type RC = DefaultRecContext
@@ -30,75 +33,30 @@ class InteractiveEvaluator(ctx: LeonContext, prog: Program) extends RecursiveEva
     def withVars(news: Map[Identifier, Expr]) = copy(news)
   }
 
-  class InteractiveGlobalContext(stepsLeft: Int, var tests: Map[Identifier, List[(List[Expr], Expr)]]) extends GlobalContext(stepsLeft)
+  class InteractiveGlobalContext(stepsLeft: Int, var tests: Map[FunDef, Map[List[Expr], Expr]]) extends GlobalContext(stepsLeft) {
+  }
 
   class InteractiveOracle(id: Identifier) {
+    import ConsoleUtils._
+
     val AbstractClassType(_, List(tpe)) = id.getType
 
-    def indent(implicit ind: Int) = {
-      "  "*ind
-    }
-
-    def ask[T](tpe: String, convert: String => Option[T])(implicit ind: Int): T = {
-      var res: Option[T] = None
-      do {
-          print(indent+"Requesting value for "+tpe+": ")
-          res = try {
-            convert(readLine())
-          } catch {
-            case e: Throwable =>
-              None
-          }
-          if (res.isEmpty) {
-            println(indent+"Unable to extract "+tpe+".")
-          }
-      } while(res.isEmpty)
-
-      res.get
-    }
-
-    def askAlternatives[T](alts: Seq[T], printer: T => String)(implicit ind: Int): T = {
-      var res: Option[T] = None
-      do {
-          println(indent+"Alternatives: ")
-          alts.zipWithIndex.foreach { case (a, i) =>
-            println(indent+"  "+(i+1)+": "+printer(a))
-          }
-
-          val i = try {
-            print(indent+">")
-            readLine().toInt
-          } catch {
-            case e: Throwable =>
-              0
-          }
-
-          if (i <= 0 || i > alts.size) {
-            println(indent+"?")
-          } else {
-            res = Some(alts(i-1))
-          }
-      } while(res.isEmpty)
-
-      res.get
-    }
-
-    def produceValueFor(tpe: TypeTree)(implicit ind: Int = 0): Expr = tpe match {
+    def produceValueFor(tpe: TypeTree): Expr = tpe match {
       case Int32Type =>
-        ask("Integer", s => Some(IntLiteral(s.toInt)))
+        ask("Int value: ", s => Some(IntLiteral(s.toInt)))
 
       case BooleanType =>
-        ask("boolean", _ match {
+        ask("Boolean value: ", _ match {
           case "true" | "" => Some(BooleanLiteral(true))
           case "false"     => Some(BooleanLiteral(false))
           case _           => None
         })
 
       case SetType(base) =>
-        val s = ask("Set size?", s => Some(s.toInt))
+        val s = ask("Set size: ", s => Some(s.toInt))
 
         val elems = for (i <- 1 to s) yield {
-          produceValueFor(base)(ind+1)
+          produceValueFor(base)
         }
 
         FiniteSet(elems).setType(SetType(base))
@@ -106,7 +64,7 @@ class InteractiveEvaluator(ctx: LeonContext, prog: Program) extends RecursiveEva
 
       case act: AbstractClassType =>
         val alternatives = act.knownCCDescendents
-        val cct = askAlternatives(alternatives, { (cct: CaseClassType) => cct.toString })
+        val cct = askAlternatives("Choose a constructor: ", alternatives, { (cct: CaseClassType) => cct.toString })
         produceValueFor(cct)
 
       case cct: CaseClassType =>
@@ -114,9 +72,9 @@ class InteractiveEvaluator(ctx: LeonContext, prog: Program) extends RecursiveEva
           (prev, t) =>
             val args = (prev.map(_.toString) ::: "?" :: Nil).padTo(cct.fields.size, "")
 
-            println(indent+cct+"("+args.mkString(", ")+")")
+            println(cct+"("+args.mkString(", ")+")")
 
-            prev ::: produceValueFor(t)(ind+1) :: Nil
+            prev ::: produceValueFor(t) :: Nil
         }
         CaseClass(cct, exs)
 
@@ -168,6 +126,11 @@ class InteractiveEvaluator(ctx: LeonContext, prog: Program) extends RecursiveEva
     fixpoint(simple, 5)(e)
   }
 
+  def isOracleType(t: TypeTree): Boolean = t match {
+    case (ct: ClassType) => ct.classDef.id.name == "Oracle"
+    case _ => false
+  }
+
   override def e(expr: Expr)(implicit rctx: RC, gctx: GC): Expr = {
     expr match {
       case wo @ WithOracle(os, b, true) => // Interactive Oracle
@@ -182,6 +145,8 @@ class InteractiveEvaluator(ctx: LeonContext, prog: Program) extends RecursiveEva
         var last: Option[Expr] = None
 
         do {
+          // We temporarily save the state of tests, so that if new tests are
+          // recorded within a erroneous execution, they can be ignored.
           var allTests = gctx.tests
           gctx.tests = Map()
           try {
@@ -190,7 +155,7 @@ class InteractiveEvaluator(ctx: LeonContext, prog: Program) extends RecursiveEva
             last = Some(res)
 
             allTests = (allTests.keySet ++ gctx.tests.keySet).map { k =>
-              k -> (allTests.getOrElse(k, Nil) ::: gctx.tests.getOrElse(k, Nil))
+              k -> (allTests.getOrElse(k, Map()) ++ gctx.tests.getOrElse(k, Map()))
             }.toMap
           } catch {
             case RuntimeError(e) =>
@@ -215,12 +180,12 @@ class InteractiveEvaluator(ctx: LeonContext, prog: Program) extends RecursiveEva
             io.right
 
           case _ =>
-            val ins = rargs.toList
             val out = super.e(FunctionInvocation(tfd, rargs))
 
-            println("  ; ---- Recorded test for "+tfd.id+": ---")
-            println("  ; "+ins.mkString(" :: ")+"   --->  "+out)
-            gctx.tests += tfd.id -> ((ins -> out) :: gctx.tests.getOrElse(tfd.id, Nil))
+            if (rargs.exists(a => isOracleType(a.getType))) {
+              val ins = rargs.toList.filter(a => !isOracleType(a.getType))
+              gctx.tests += tfd.fd -> (gctx.tests.getOrElse(tfd.fd, Map()) + (ins -> out))
+            }
 
             out
 
@@ -228,6 +193,83 @@ class InteractiveEvaluator(ctx: LeonContext, prog: Program) extends RecursiveEva
       case _ =>
         super.e(expr)
     }
+  }
+
+  def getRecordedTests: Map[FunDef, Map[List[Expr], Expr]] = {
+      lastGlobalContext.map(_.tests).getOrElse(Map())
+  }
+
+  def oracleCalls(fd: FunDef): Set[FunctionInvocation] = {
+    fd.body.map(collect[FunctionInvocation]{
+      case fi @ FunctionInvocation(tfd, args) if tfd.id.name == "Oracle.head" => Set(fi)
+      case _ => Set()
+    }).getOrElse(Set())
+  }
+
+  def printRecordedTests() {
+    import leon.utils.ASCIITables._
+    for ((fd, ts) <- getRecordedTests) {
+      var tbl = new Table("Tests of "+fd.id.name)
+
+      val params = fd.params.toList.filter(p => !isOracleType(p.getType))
+      tbl += Row(params.map(p => Cell(p.id.name)) ::: Cell("=>") :: Cell("ret") :: Nil)
+      tbl += Separator
+      for ((ins, out) <- ts) {
+        tbl += Row(ins.map(i => Cell(i)) ::: Cell("=>") :: Cell(out) :: Nil)
+      }
+
+      println(tbl.render)
+    }
+  }
+
+  def synthesizeFromTests() {
+    for ((fd, tests) <- getRecordedTests) {
+      val ocs = oracleCalls(fd)
+
+      if (ocs.nonEmpty) {
+        println("Synthesizing "+fd.id)
+
+        val (as, os) = fd.params.partition(p => !isOracleType(p.getType))
+
+        assert(os.size == 1, "Only support one oracle for now")
+
+        val nfd = new FunDef(fd.id.freshen, fd.tparams, fd.returnType, as)
+        val (pid, post) = fd.postcondition.getOrElse((FreshIdentifier("res").setType(fd.returnType), BooleanLiteral(true)))
+
+        val wopost = tests.foldLeft(BooleanLiteral(true): Expr){ case (e, (ins,out)) =>
+          IfExpr(And((as zip ins).map(a => Equals(a._1.id.toVariable, a._2))), Equals(Variable(pid), out), e)
+        }
+        val wobody = withPostcondition(fd.body.get, Some((pid, wopost)))
+        val wo = WithOracle(os.map(_.id).toList, wobody, false)
+
+        nfd.fullBody = withBody(fd.fullBody, Some(wo))
+
+        ConvertWithOracle.getChoose(wo) match {
+          case Some(ch) =>
+            val p = Problem.fromChoose(ch)
+            val s = new Synthesizer(ctx, Some(nfd), prog, p, SynthesisOptions(manualSearch = true))
+            println(p)
+            readLine()
+            val res = s.synthesize()
+            println(res)
+          case None =>
+
+        }
+      }
+    }
+  }
+
+  override def eval(ex: Expr, mappings: Map[Identifier, Expr]) = {
+    var last: Option[EvaluationResult] = None
+    do {
+      last = Some(super.eval(ex, mappings))
+
+      printRecordedTests()
+      synthesizeFromTests()
+
+    } while(yesOrNo("Run again?"))
+
+    last.get
   }
 
 }
