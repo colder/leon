@@ -33,7 +33,10 @@ trait SMTLIBCVC4Target extends SMTLIBTarget {
       "--no-incremental",
       "--tear-down-incremental",
       "--dt-rewrite-error-sel",
+      "--rewrite-divk",
       "--print-success",
+      "--force-logic=AUFBVDTNIRAFS",
+      "--cbqi2",
       "--lang", "smt"
     ) ++ userDefinedOps(ctx).toSeq
   }
