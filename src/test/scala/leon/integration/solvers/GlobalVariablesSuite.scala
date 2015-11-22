@@ -26,11 +26,7 @@ class GlobalVariablesSuite extends LeonTestSuiteWithProgram with ExpressionsDSL 
        |object GlobalVariables {
        |
        |  def test(i: BigInt): BigInt = {
-       |    test2(i)
-       |  }
-       |
-       |  def test2(i: BigInt): BigInt = {
-       |    BigInt(0) // will get replaced
+       |    0 // will be replaced
        |  }
        |} """.stripMargin
   )
@@ -53,25 +49,17 @@ class GlobalVariablesSuite extends LeonTestSuiteWithProgram with ExpressionsDSL 
       val ctx = fix._1
       val pgm = fix._2
 
-      pgm.lookup("GlobalVariables.test2") match {
+      pgm.lookup("GlobalVariables.test") match {
         case Some(fd: FunDef) =>
-          val solver = sf(ctx, pgm)
           val b0 = FreshIdentifier("B", BooleanType);
           fd.body = Some(IfExpr(b0.toVariable, bi(1), bi(-1)))
 
-          pgm.lookup("GlobalVariables.test") match {
-            case Some(fd: FunDef) =>
+          val cnstr = LessThan(FunctionInvocation(fd.typed, Seq(bi(42))), bi(0))
+          val solver = sf(ctx, pgm)
+          solver.assertCnstr(And(b0.toVariable, cnstr))
 
-              val cnstr = LessThan(FunctionInvocation(fd.typed, Seq(bi(42))), bi(0))
-              val solver = sf(ctx, pgm)
-              solver.assertCnstr(b0.toVariable)
-              solver.assertCnstr(cnstr)
-
-              if (solver.check != Some(false)) {
-                fail("Global variables not correctly handled.")
-              }
-            case _ =>
-              fail("Entry point not found!")
+          if (solver.check != Some(false)) {
+            fail("Global variables not correctly handled.")
           }
         case _ =>
           fail("Function with global body not found")
