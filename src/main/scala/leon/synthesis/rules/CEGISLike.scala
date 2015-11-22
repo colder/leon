@@ -49,7 +49,7 @@ abstract class CEGISLike[T <% Typed](name: String) extends Rule(name) {
     val useShrink        = sctx.settings.cegisUseShrink.getOrElse(false)
 
     // Limits the number of programs CEGIS will specifically validate individually
-    val validateUpTo     = 0
+    val validateUpTo     = 3
 
     // Shrink the program when the ratio of passing cases is less than the threshold
     val shrinkThreshold  = 1.0/2
