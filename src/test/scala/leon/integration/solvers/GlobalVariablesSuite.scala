@@ -58,8 +58,12 @@ class GlobalVariablesSuite extends LeonTestSuiteWithProgram with ExpressionsDSL 
           val solver = sf(ctx, pgm)
           solver.assertCnstr(And(b0.toVariable, cnstr))
 
-          if (solver.check != Some(false)) {
-            fail("Global variables not correctly handled.")
+          try { 
+            if (solver.check != Some(false)) {
+              fail("Global variables not correctly handled.")
+            }
+          } finally {
+            solver.free()
           }
         case _ =>
           fail("Function with global body not found")
