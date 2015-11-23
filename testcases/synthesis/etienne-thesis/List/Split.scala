@@ -34,4 +34,6 @@ object Complete {
     choose { (res : (List,List)) => splitSpec(list, res) }
   }
 
+  // case (h1, (h2, t)) => (h1 :: split(t)._1, h2 :: split(t)._2)
+
 }
