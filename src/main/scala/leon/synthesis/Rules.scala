@@ -55,7 +55,7 @@ object Rules {
     EqualitySplit,
     InequalitySplit,
     CEGIS,
-    TEGIS,
+    //TEGIS,
     //BottomUpTEGIS,
     rules.Assert,
     DetupleOutput,
