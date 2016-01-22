@@ -12,14 +12,27 @@ object Parser {
   case object TMinus extends Token
   case class  TLit(v: BigInt) extends Token
 
+  abstract class Tree
+  case class Lit(v: BigInt) extends Tree
+  case class Plus(a: Tree, b: Tree) extends Tree
+  case class Minus(a: Tree, b: Tree) extends Tree
+
   abstract class ParseResult {
     def isValid: Boolean
     def isEnd: Boolean
+
+    def compose(f: Tree => Tree) = {
+      this match {
+        case ParseOk(t, res) => ParseOk(f(t), res)
+        case _ => ParseError
+      }
+    }
   }
 
-  case class ParseOk(rest: List[Token]) extends ParseResult {
+  case class ParseOk(t: Tree, rest: List[Token]) extends ParseResult {
     override def isValid = true
     override def isEnd = rest.isEmpty
+
   }
 
   case object ParseError extends ParseResult {
@@ -47,15 +60,23 @@ object Parser {
   @inline
   def parsingTests(in: List[Token], out: ParseResult): Boolean = {
     (in, out) passes {
-      case Cons(TLit(_), Cons(TPlus, Cons(TLit(_), Nil()))) => ParseOk(Nil())
-      case Cons(TLit(_), Cons(TMinus, Cons(TLit(_), Nil()))) => ParseOk(Nil())
-      case Cons(TLit(_), Nil()) => ParseOk(Nil())
-      case Cons(TLit(_), Cons(TLit(_), _)) => ParseError
-      case Cons(TLit(_), Nil()) => ParseOk(Nil())
-      case Cons(TPlus, Cons(TMinus, _)) => ParseError
-      case Cons(TMinus, Cons(TMinus, _)) => ParseError
-      case Cons(TMinus, Cons(TPlus, _)) => ParseError
-      case Cons(TLit(_), Cons(TMinus, Cons(TLit(_), Cons(TMinus, Cons(TLit(_), Nil()))))) => ParseOk(Nil())
+      // Good examples
+      case Cons(TLit(a), Cons(TPlus, Cons(TLit(b), Nil())))                              => ParseOk(Plus(Lit(a), Lit(b)), Nil())
+      case Cons(TLit(a), Cons(TMinus, Cons(TLit(b), Nil())))                             => ParseOk(Minus(Lit(a), Lit(b)), Nil())
+      case Cons(TLit(a), Cons(TMinus, Cons(TLit(b), Cons(TPlus, Cons(TLit(c), Nil()))))) => ParseOk(Plus(Minus(Lit(a), Lit(b)), Lit(c)), Nil())
+      case Cons(TLit(a), Nil())                                                          => ParseOk(Lit(a), Nil())
+
+      // Bad examples
+      case Cons(TPlus, Nil())                                               => ParseError
+      case Cons(TMinus, Cons(TLit(_), Cons(TLit(_), Nil())))                => ParseError
+      case Cons(TLit(_), Cons(TMinus, Cons(TLit(_), Cons(TLit(_), Nil())))) => ParseError
+      case Cons(TLit(_), Cons(TLit(_), Cons(TLit(_), Nil())))               => ParseError
+      case Cons(TLit(_), Cons(TLit(_), Nil()))                              => ParseError
+      case Cons(TPlus, Cons(TPlus, Nil()))                                  => ParseError
+      case Cons(TPlus, Cons(TMinus, Nil()))                                 => ParseError
+      case Cons(TMinus, Cons(TPlus, Nil()))                                 => ParseError
+      case Cons(TMinus, Cons(TMinus, Nil()))                                => ParseError
+      case Nil()                                                            => ParseError
     }
   }
 

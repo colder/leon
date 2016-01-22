@@ -4,6 +4,8 @@ package leon
 package grammars
 
 import purescala.Types._
+import purescala.Definitions._
+import purescala.Common._
 import purescala.Expressions._
 import purescala.Constructors._
 
@@ -60,6 +62,13 @@ case object BaseGrammar extends ExpressionGrammar[TypeTree] {
         nonTerminal(List(st, st), { case Seq(a, b) => SetUnion(a, b) }),
         nonTerminal(List(st, st), { case Seq(a, b) => SetIntersection(a, b) }),
         nonTerminal(List(st, st), { case Seq(a, b) => SetDifference(a, b) })
+      )
+
+    case FunctionType(froms, to) =>
+      val args = froms.map(ft => ValDef(FreshIdentifier("a", ft, true)))
+
+      List(
+        nonTerminal(List(to), { case Seq(body) => Lambda(args, body) })
       )
 
     case UnitType =>

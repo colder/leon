@@ -56,7 +56,7 @@ class WrappedCostModel(cm: CostModel, name: String) extends CostModel(name) {
 
 /** Computes a cost corresponding of the size of the solution expression divided by 10.
   * For problems, returns a cost of 1 */
-class SizeBasedCostModel(name: String) extends CostModel(name) {
+class SizeBasedCostModel(name: String, max: Int) extends CostModel(name) {
   def solution(s: Solution) = {
     Cost(formulaSize(s.toExpr)/10)
   }
@@ -82,15 +82,15 @@ class SizeBasedCostModel(name: String) extends CostModel(name) {
             1
         }
         Cost(osubs.toList.flatten.foldLeft(selfCost)(_ + _.minSize))
-    }   
+    }
   }
 
-  def impossible = Cost(200)
+  def impossible = Cost(max)
 }
 
-case object NaiveCostModel extends SizeBasedCostModel("Naive")
+case object NaiveCostModel extends SizeBasedCostModel("Naive", 2000)
 
-case object WeightedBranchesCostModel extends SizeBasedCostModel("WeightedBranches") {
+case object WeightedBranchesCostModel extends SizeBasedCostModel("WeightedBranches", 2000) {
 
   def branchesCost(e: Expr): Int = {
     case class BC(cost: Int, nesting: Int)
