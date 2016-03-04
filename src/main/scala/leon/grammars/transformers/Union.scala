@@ -6,12 +6,12 @@ package transformers
 
 import purescala.Types.Typed
 
-case class Union[T <: Typed](gs: Seq[ExpressionGrammar[T]]) extends ExpressionGrammar[T] {
-  val subGrammars: Seq[ExpressionGrammar[T]] = gs.flatMap {
-    case u: Union[T] => u.subGrammars
+case class Union(gs: Seq[ExpressionGrammar]) extends ExpressionGrammar {
+  val subGrammars: Seq[ExpressionGrammar] = gs.flatMap {
+    case u: Union => u.subGrammars
     case g => Seq(g)
   }
 
-  def computeProductions(t: T)(implicit ctx: LeonContext): Seq[Prod] =
-    subGrammars.flatMap(_.getProductions(t))
+  def computeProductions(label: Label)(implicit ctx: LeonContext): Seq[Prod] =
+    subGrammars.flatMap(_.getProductions(label))
 }
