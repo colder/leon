@@ -5,6 +5,8 @@ package synthesis
 package rules
 
 import grammars._
+import grammars.Tags
+import grammars.Aspects._
 import grammars.transformers._
 import purescala.Types.TypeTree
 
@@ -30,7 +32,7 @@ case object CEGIS extends CEGISLike("CEGIS") {
       //grammar = TaggedGrammar(base),
       //rootLabel = TaggedNonTerm(_, Tags.Top, 0, None),
       grammar = NaiveCEGIS.getParams(sctx,p).grammar,
-      rootLabel = Label(_),
+      rootLabel = Label(_).withAspect(Tagged(Tags.Top, 0, None)),
       optimizations = true
     )
   }
