@@ -4,6 +4,7 @@ package leon
 package grammars
 package transformers
 
+import purescala.Expressions.Expr
 import purescala.Types.Typed
 
 case class Union(gs: Seq[ExpressionGrammar]) extends ExpressionGrammar {
@@ -12,6 +13,6 @@ case class Union(gs: Seq[ExpressionGrammar]) extends ExpressionGrammar {
     case g => Seq(g)
   }
 
-  def computeProductions(label: Label)(implicit ctx: LeonContext): Seq[Prod] =
+  def computeProductions(label: Label)(implicit ctx: LeonContext): Seq[ProductionRule[Label, Expr]] =
     subGrammars.flatMap(_.getProductions(label))
 }

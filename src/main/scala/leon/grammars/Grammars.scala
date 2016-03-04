@@ -13,7 +13,7 @@ import synthesis.{SynthesisContext, Problem}
 
 object Grammars {
 
-  def default(prog: Program, inputs: Seq[Expr], currentFunction: FunDef, exclude: Set[FunDef], ws: Expr, pc: Expr): ExpressionGrammar[TypeTree] = {
+  def default(prog: Program, inputs: Seq[Expr], currentFunction: FunDef, exclude: Set[FunDef], ws: Expr, pc: Expr): ExpressionGrammar = {
     BaseGrammar ||
     EqualityGrammar(Set(IntegerType, Int32Type, BooleanType) ++ inputs.map { _.getType }) ||
     OneOf(inputs) ||
@@ -22,12 +22,14 @@ object Grammars {
     SafeRecursiveCalls(prog, ws, pc)
   }
 
-  def default(sctx: SynthesisContext, p: Problem): ExpressionGrammar[TypeTree] = {
+  def default(sctx: SynthesisContext, p: Problem): ExpressionGrammar = {
     default(sctx.program, p.as.map(_.toVariable), sctx.functionContext, sctx.settings.functionsToIgnore,  p.ws, p.pc)
   }
 
+  /*
   def typeDepthBound[T <: Typed](g: ExpressionGrammar[T], b: Int) = {
     g.filter(g => g.subTrees.forall(t => typeDepth(t.getType) <= b))
   }
+  */
 }
 

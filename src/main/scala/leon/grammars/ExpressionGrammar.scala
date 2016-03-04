@@ -15,26 +15,14 @@ import scala.collection.mutable.{HashMap => MutableMap}
   */
 abstract class ExpressionGrammar {
 
-  type Prod = ProductionRule[Label, Expr]
-
-  private[this] val cache = new MutableMap[Label, Seq[Prod]]()
-
-  /** Generates a [[ProductionRule]] without nonterminal symbols */
-  def terminal(builder: => Expr, tag: Tags.Tag = Tags.Top, cost: Int = 1) = {
-    ProductionRule[Label, Expr](Nil, { (subs: Seq[Expr]) => builder }, tag, cost)
-  }
-
-  /** Generates a [[ProductionRule]] with nonterminal symbols */
-  def nonTerminal(subs: Seq[Label], builder: (Seq[Expr] => Expr), tag: Tags.Tag = Tags.Top, cost: Int = 1) = {
-    ProductionRule[Label, Expr](subs, builder, tag, cost)
-  }
+  private[this] val cache = new MutableMap[Label, Seq[ProductionRule[Label, Expr]]]()
 
   /** The list of production rules for this grammar for a given nonterminal.
     * This is the cached version of [[getProductions]] which clients should use.
     *
     * @param lab The nonterminal for which production rules will be generated
     */
-  def getProductions(lab: Label)(implicit ctx: LeonContext): Seq[Prod] = {
+  def getProductions(lab: Label)(implicit ctx: LeonContext) = {
     cache.getOrElse(lab, {
       val res = computeProductions(lab)
       cache += lab -> res
@@ -46,15 +34,8 @@ abstract class ExpressionGrammar {
     *
     * @param lab The nonterminal for which production rules will be generated
     */
-  def computeProductions(lab: Label)(implicit ctx: LeonContext): Seq[Prod]
+  def computeProductions(lab: Label)(implicit ctx: LeonContext): Seq[ProductionRule[Label, Expr]]
 
-  def filter(f: Prod => Boolean) = {
-    new ExpressionGrammar {
-      def computeProductions(lab: Label)(implicit ctx: LeonContext) = {
-        ExpressionGrammar.this.computeProductions(lab).filter(f)
-      }
-    }
-  }
 
   final def ||(that: ExpressionGrammar): ExpressionGrammar = {
     Union(Seq(this, that))
@@ -76,4 +57,50 @@ abstract class ExpressionGrammar {
       }
     }
   }
+}
+
+abstract class SimpleExpressionGrammar extends ExpressionGrammar {
+
+  type Prod = ProductionRule[TypeTree, Expr]
+
+  /** Generates a [[ProductionRule]] without nonterminal symbols */
+  def terminal(builder: => Expr, tag: Tags.Tag = Tags.Top, cost: Int = 1) = {
+    ProductionRule[TypeTree, Expr](Nil, { (subs: Seq[Expr]) => builder }, tag, cost)
+  }
+
+  /** Generates a [[ProductionRule]] with nonterminal symbols */
+  def nonTerminal(subs: Seq[TypeTree], builder: (Seq[Expr] => Expr), tag: Tags.Tag = Tags.Top, cost: Int = 1) = {
+    ProductionRule[TypeTree, Expr](subs, builder, tag, cost)
+  }
+
+  def filter(f: Prod => Boolean) = {
+    new SimpleExpressionGrammar {
+      def computeProductions(lab: TypeTree)(implicit ctx: LeonContext) = {
+        SimpleExpressionGrammar.this.computeProductions(lab).filter(f)
+      }
+    }
+  }
+
+  /** The list of production rules for this grammar for a given nonterminal
+    *
+    * @param lab The nonterminal for which production rules will be generated
+    */
+  def computeProductions(lab: Label)(implicit ctx: LeonContext): Seq[ProductionRule[Label, Expr]] = {
+
+    def applyAspect(ps: Seq[ProductionRule[Label, Expr]], a: Aspect) = {
+      ps.flatMap(a.applyTo(_))
+    }
+
+    var prods = computeProductions(lab.getType).map { p =>
+      ProductionRule(p.subTrees.map(Label(_)), p.builder, p.tag, p.cost)
+    }
+
+    for (a <- lab.aspects) {
+      prods = applyAspect(prods, a)
+    }
+
+    prods
+  }
+
+  def computeProductions(tpe: TypeTree)(implicit ctx: LeonContext): Seq[ProductionRule[TypeTree, Expr]]
 }

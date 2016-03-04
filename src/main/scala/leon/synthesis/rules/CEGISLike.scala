@@ -15,6 +15,7 @@ import purescala.Constructors._
 import solvers._
 import grammars._
 import grammars.transformers._
+import grammars.Aspects._
 import leon.utils._
 
 import evaluators._
@@ -23,11 +24,11 @@ import codegen.CodeGenParams
 
 import scala.collection.mutable.{HashMap=>MutableMap, ArrayBuffer}
 
-abstract class CEGISLike[T <: Typed](name: String) extends Rule(name) {
+abstract class CEGISLike(name: String) extends Rule(name) {
 
   case class CegisParams(
-    grammar: ExpressionGrammar[T],
-    rootLabel: TypeTree => T,
+    grammar: ExpressionGrammar,
+    rootLabel: TypeTree => Label,
     optimizations: Boolean,
     maxSize: Option[Int] = None
   )
@@ -72,13 +73,15 @@ abstract class CEGISLike[T <: Typed](name: String) extends Rule(name) {
 
       private var termSize = 0
 
-      val grammar = SizeBoundedGrammar(params.grammar, params.optimizations)
+      //val grammar = SizeBoundedGrammar(params.grammar, params.optimizations)
+      val grammar = params.grammar
 
-      def rootLabel = SizedNonTerm(params.rootLabel(tupleTypeWrap(p.xs.map(_.getType))), termSize)
+      //def rootLabel = SizedNonTerm(params.rootLabel(tupleTypeWrap(p.xs.map(_.getType))), termSize)
+      def rootLabel = params.rootLabel(tupleTypeWrap(p.xs.map(_.getType))).withAspect(Sized(termSize))
 
-      var nAltsCache = Map[SizedNonTerm[T], Int]()
+      var nAltsCache = Map[Label, Int]()
 
-      def countAlternatives(l: SizedNonTerm[T]): Int = {
+      def countAlternatives(l: Label): Int = {
         if (!(nAltsCache contains l)) {
           val count = grammar.getProductions(l).map { gen =>
             gen.subTrees.map(countAlternatives).product
@@ -121,19 +124,19 @@ abstract class CEGISLike[T <: Typed](name: String) extends Rule(name) {
 
 
       class CGenerator {
-        private var buffers = Map[SizedNonTerm[T], Stream[Identifier]]()
+        private var buffers = Map[Label, Stream[Identifier]]()
 
-        private var slots = Map[SizedNonTerm[T], Int]().withDefaultValue(0)
+        private var slots = Map[Label, Int]().withDefaultValue(0)
 
-        private def streamOf(t: SizedNonTerm[T]): Stream[Identifier] = Stream.continually(
+        private def streamOf(t: Label): Stream[Identifier] = Stream.continually(
           FreshIdentifier(t.asString, t.getType, true)
         )
 
         def rewind(): Unit = {
-          slots = Map[SizedNonTerm[T], Int]().withDefaultValue(0)
+          slots = Map[Label, Int]().withDefaultValue(0)
         }
 
-        def getNext(t: SizedNonTerm[T]) = {
+        def getNext(t: Label) = {
           if (!(buffers contains t)) {
             buffers += t -> streamOf(t)
           }
@@ -158,7 +161,7 @@ abstract class CEGISLike[T <: Typed](name: String) extends Rule(name) {
           id
         }
 
-        def defineCTreeFor(l: SizedNonTerm[T], c: Identifier): Unit = {
+        def defineCTreeFor(l: Label, c: Identifier): Unit = {
           if (!(cTree contains c)) {
             val cGen = new CGenerator()
 

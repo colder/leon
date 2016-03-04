@@ -7,22 +7,14 @@ import purescala.Types._
 import purescala.Expressions._
 import purescala.Constructors._
 
-case class Label(
-  tpe: TypeTree,
-  cost: Int,
-  exprs: Set[Expr] = Set()
-) extends Typed {
+case class Label(tpe: TypeTree, aspects: List[Aspect] = Nil) extends Typed {
   val getType = tpe
 
   def asString(implicit ctx: LeonContext): String = {
     val ts = tpe.asString
-    val oc = "|"+cost+"|"
-    val es = if(exprs.nonEmpty) {
-      exprs.map(_.asString).mkString("{",",","}")
-    } else {
-      ""
-    }
 
-    ts + oc + es
+    ts + aspects.map(_.asString).mkString
   }
+
+  def withAspect(a: Aspect) = Label(tpe, aspects :+ a)
 }

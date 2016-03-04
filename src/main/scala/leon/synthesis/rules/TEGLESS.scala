@@ -10,7 +10,7 @@ import utils._
 import Witnesses._
 import grammars._
 
-case object TEGLESS extends TEGISLike[NonTerminal[String]]("TEGLESS") {
+case object TEGLESS extends TEGISLike("TEGLESS") {
   def getParams(sctx: SynthesisContext, p: Problem) = {
 
     val TopLevelAnds(clauses) = p.ws
@@ -28,11 +28,12 @@ case object TEGLESS extends TEGISLike[NonTerminal[String]]("TEGLESS") {
       }
     }
 
-    val guidedGrammar = guides.map(SimilarTo(_, inputs.toSet, sctx, p)).foldLeft[ExpressionGrammar[NonTerminal[String]]](Empty())(_ || _)
+    val guidedGrammar = guides.map(SimilarTo(_, inputs.toSet, sctx, p)).foldLeft[ExpressionGrammar](Empty())(_ || _)
 
     TegisParams(
       grammar = guidedGrammar,
-      rootLabel = { (tpe: TypeTree) => NonTerminal(tpe, "G0") }
+      //rootLabel = { (tpe: TypeTree) => NonTerminal(tpe, "G0") }
+      rootLabel = { (tpe: TypeTree) => Label(tpe) }
     )
   }
 }

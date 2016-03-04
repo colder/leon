@@ -10,15 +10,12 @@ import purescala.Types.TypeTree
 import purescala.TypeOps.isSubtypeOf
 
 /** Generates one production rule for each expression in a sequence that has compatible type */
-case class OneOf(exprs: Seq[Expr]) extends ExpressionGrammar {
-  lazy val prods = {
-    exprs.map { e =>
-      val c = formulaSize(e)
-      Label(e.getType, c) -> terminal(e, Tags.Top, c)
-    }
-  }.groupBy(_._1).mapValues(_ map (_._2))
+case class OneOf(exprs: Seq[Expr]) extends SimpleExpressionGrammar {
 
-  def computeProductions(l: Label)(implicit ctx: LeonContext): Seq[Prod] = {
-    prods.getOrElse(l, Nil)
+  def computeProductions(tpe: TypeTree)(implicit ctx: LeonContext): Seq[Prod] = {
+    exprs.collect {
+      case e if isSubtypeOf(e.getType, tpe) =>
+        terminal(e, cost = formulaSize(e))
+    }
   }
 }
