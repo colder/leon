@@ -5,6 +5,7 @@ package grammars
 
 import purescala.Expressions.Expr
 import utils.SeqUtils._
+import Tags._
 
 abstract class Aspect {
   def asString(implicit ctx: LeonContext): String
@@ -19,8 +20,6 @@ object Aspects {
         subTrees = p.subTrees.map(lab => lab.withAspect(this))
       ))
     }
-
-
   }
 
   case class Sized(size: Int) extends Aspect {
@@ -43,7 +42,6 @@ object Aspects {
         } else {
           sumTo(size - p.cost, p.arity)
         }
-        println("Decomposing "+(size-p.cost)+" in "+p.arity + "; sizes: "+sizes)
 
         for (ss <- sizes) yield {
           val newSubTrees = (p.subTrees zip ss).map {
@@ -53,6 +51,91 @@ object Aspects {
           ProductionRule(newSubTrees, p.builder, p.tag)
         }
       }
+    }
+  }
+
+  case class Tagged(tag: Tag, pos: Int, isConst: Option[Boolean]) extends Aspect {
+    private val cString = isConst match {
+      case Some(true) => "↓"
+      case Some(false) => "↑"
+      case None => "○"
+    }
+
+    /** [[isConst]] is printed as follows: ↓ for constants only, ↑ for nonconstants only,
+      * ○ for anything allowed.
+      */
+    override def asString(implicit ctx: LeonContext): String = s"$tag@$pos$cString"
+
+    val exclude: Set[Tag] = (tag, pos) match {
+      case (Top,   _) => Set()
+      case (And,   0) => Set(And, BooleanC)
+      case (And,   1) => Set(BooleanC)
+      case (Or,    0) => Set(Or, BooleanC)
+      case (Or,    1) => Set(BooleanC)
+      case (Plus,  0) => Set(Plus, Zero, One)
+      case (Plus,  1) => Set(Zero)
+      case (Minus, 1) => Set(Zero)
+      case (Not,   _) => Set(Not, BooleanC)
+      case (Times, 0) => Set(Times, Zero, One)
+      case (Times, 1) => Set(Zero, One)
+      case (Equals,_) => Set(Not, BooleanC)
+      case (Div | Mod, 0 | 1) => Set(Zero, One)
+      case (FunCall(true, _), 0) => Set(Constructor(true)) // Don't allow Nil().size etc.
+      case _ => Set()
+    }
+
+    def applyTo(p: ProductionRule[Label, Expr])(implicit ctx: LeonContext): Seq[ProductionRule[Label, Expr]] = {
+      // Point (4) for this level
+      val constFilter: ProductionRule[Label, Expr] => Boolean = isConst match {
+        case Some(b) =>
+          innerGen => Tags.isConst(innerGen.tag) == b
+        case None =>
+          _ => true
+      }
+
+      if (constFilter(p) && !exclude(p.tag)) {
+        Seq(p)
+      } else {
+        Nil
+      }
+//  def computeProductions(t: TaggedNonTerm[T])(implicit ctx: LeonContext): Seq[Prod] = {
+//
+//
+//    g.computeProductions(t.underlying)
+//      // Include only constants iff constants are forced, only non-constants iff they are forced
+//      .filter(constFilter)
+//      // Points (1), (2). (3)
+//      .filterNot { innerGen => exclude(t.tag, t.pos)(innerGen.tag) }
+//      .flatMap   { innerGen =>
+//
+//        def nt(isConst: Int => Option[Boolean]) = nonTerminal(
+//          innerGen.subTrees.zipWithIndex.map {
+//            case (t, pos) => TaggedNonTerm(t, innerGen.tag, pos, isConst(pos))
+//          },
+//          innerGen.builder,
+//          innerGen.tag
+//        )
+//
+//        def powerSet[A](t: Set[A]): Set[Set[A]] = {
+//          @scala.annotation.tailrec
+//          def pwr(t: Set[A], ps: Set[Set[A]]): Set[Set[A]] =
+//            if (t.isEmpty) ps
+//            else pwr(t.tail, ps ++ (ps map (_ + t.head)))
+//
+//          pwr(t, Set(Set.empty[A]))
+//        }
+//
+//        // Allow constants everywhere if this is allowed, otherwise demand at least 1 variable.
+//        // Aka. tag subTrees correctly so point (4) is enforced in the lower level
+//        // (also, make sure we treat terminals correctly).
+//        if (innerGen.isTerminal || allConstArgsAllowed(innerGen.tag)) {
+//          Seq(nt(_ => None))
+//        } else {
+//          val indices = innerGen.subTrees.indices.toSet
+//          (powerSet(indices) - indices) map (indices => nt(x => Some(indices(x))))
+//        }
+//      }
+//  }
     }
   }
 }
