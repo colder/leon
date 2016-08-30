@@ -208,7 +208,9 @@ abstract class RecursiveEvaluator(ctx: LeonContext, prog: Program, val bank: Eva
         case Some(post) =>
           e(application(post, Seq(callResult)))(frame, gctx) match {
             case BooleanLiteral(true) =>
-            case BooleanLiteral(false) => throw RuntimeError("Postcondition violation for " + tfd.id.asString + " reached in evaluation.")
+            case BooleanLiteral(false) =>
+              val expr = FunctionInvocation(tfd, evArgs)
+              throw RuntimeError("Postcondition violation for " + tfd.id.asString + " reached in evaluation.", Some(expr))
             case other => throw EvalError(typeErrorMsg(other, BooleanType))
           }
         case None =>
